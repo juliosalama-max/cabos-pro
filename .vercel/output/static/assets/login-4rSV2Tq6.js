@@ -1,0 +1,1 @@
+import{o as e}from"./brand-Bko2Oada.js";import{n as t,t as n}from"./login-screen-CZ0_q3HP.js";import{r}from"./index-Cz5R6K8F.js";var i=e();function a(){let{user:e,isPending:a}=t();return a?(0,i.jsx)(n,{pending:!0}):e?(0,i.jsx)(r,{to:`/`}):(0,i.jsx)(n,{})}export{a as component};

@@ -1,0 +1,5 @@
+- Projeto Engenharia Apps: hub https://engenharia-apps.grok.me e app SPDA Pro https://analise-risco-spda.grok.me [2026-08-26]
+- Autor dos apps: Júlio Salama, Eng. Eletricista, CREA 48732 [2026-08-26]
+- Identidade visual fixa: fundo creme #F3EEE4, marca verde-escuro #1F4A3C, serif nos títulos, Lucide nos ícones, layout app em 3 colunas (etapas / formulário / veredito) [2026-08-26]
+- Catálogo planejado: SPDA Pro (publicado), Condutores, Curto-circuito, Aterramento, Iluminação, Grupo gerador, QGBT, Motores, Qualidade de energia, Memorial [2026-08-26]
+- Instruções de Settings salvas em artifacts/INSTRUCOES-SETTINGS-ENGENHARIA-APPS.md [2026-08-26]

@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: "Source Sans 3", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-bg: #f3eee4;
+  --color-bg-elevated: #faf6ee;
+  --color-surface: #faf6ee;
+  --color-surface-2: #f7f1e8;
+  --color-paper: #fffcf7;
+  --color-fg: #1c1917;
+  --color-muted: #6b6560;
+  --color-subtle: #8a7e6e;
+  --color-brand: #1f4a3c;
+  --color-brand-hover: #16382d;
+  --color-brand-soft: #e4ede7;
+  --color-accent: #1f4a3c;
+  --color-accent-fg: #fffcf7;
+  --color-border: #e6dfd4;
+  --color-ok: #2f6b4f;
+  --color-ok-dim: #e4ede7;
+  --color-danger: #8b3a2f;
+  --color-danger-dim: #f3e4e0;
+  --color-warn: #8a7e6e;
+  --color-warn-dim: #ede6da;
+  --color-ring: #1f4a3c;
+  --color-secondary: #ede6da;
+
+  --text-label: 0.6875rem;
+  --text-help: 0.8125rem;
+
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.04), 0 8px 24px rgba(28, 25, 23, 0.04);
+  --shadow-border: 0 0 0 1px #e6dfd4;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    color-scheme: light;
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  * {
+    border-color: var(--color-border);
+  }
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color-scheme: light;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: var(--font-serif);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
+
+.print-only {
+  display: none;
+}

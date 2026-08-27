@@ -3,29 +3,39 @@
 @theme {
   --font-sans: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
   --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
   --font-mono: "Source Sans 3", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --color-bg: #f3eee4;
+  --color-background: #f3eee4;
   --color-bg-elevated: #faf6ee;
   --color-surface: #faf6ee;
+  --color-card: #faf6ee;
   --color-surface-2: #f7f1e8;
   --color-paper: #fffcf7;
-  --color-fg: #1c1917;
-  --color-muted: #6b6560;
-  --color-subtle: #8a7e6e;
-  --color-brand: #1f4a3c;
+  --color-fg: #1c1a16;
+  --color-ink: #1c1a16;
+  --color-foreground: #1c1a16;
+  --color-muted: #6b6458;
+  --color-subtle: #7a6248;
+  --color-brand: #1f4d45;
+  --color-primary: #1f4d45;
   --color-brand-hover: #16382d;
   --color-brand-soft: #e4ede7;
-  --color-accent: #1f4a3c;
-  --color-accent-fg: #fffcf7;
-  --color-border: #e6dfd4;
+  --color-accent: #1f4d45;
+  --color-accent-fg: #f3eee4;
+  --color-primary-fg: #f3eee4;
+  --color-primary-foreground: #f3eee4;
+  --color-border: #ddd4c4;
   --color-ok: #2f6b4f;
+  --color-live: #2f6b4f;
   --color-ok-dim: #e4ede7;
   --color-danger: #8b3a2f;
   --color-danger-dim: #f3e4e0;
-  --color-warn: #8a7e6e;
+  --color-warn: #7a6248;
+  --color-soon: #7a6248;
   --color-warn-dim: #ede6da;
-  --color-ring: #1f4a3c;
+  --color-ring: #1f4d45;
   --color-secondary: #ede6da;
 
   --text-label: 0.6875rem;
@@ -36,8 +46,8 @@
   --radius-lg: 16px;
   --radius-xl: 22px;
 
-  --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.04), 0 8px 24px rgba(28, 25, 23, 0.04);
-  --shadow-border: 0 0 0 1px #e6dfd4;
+  --shadow-card: 0 1px 2px rgba(28, 26, 22, 0.04), 0 8px 24px rgba(28, 26, 22, 0.04);
+  --shadow-border: 0 0 0 1px #ddd4c4;
 }
 
 @layer base {
@@ -54,7 +64,7 @@
     background: var(--color-bg);
     color: var(--color-fg);
     font-family: var(--font-sans);
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1.5;
   }
   button:not(:disabled),
@@ -64,7 +74,7 @@
   h1,
   h2,
   h3 {
-    font-family: var(--font-serif);
+    font-family: var(--font-display);
     text-wrap: balance;
   }
   p {
@@ -80,14 +90,15 @@
     color-scheme: light;
   }
   :focus-visible {
-    outline: 2px solid var(--color-brand);
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
   }
 }
 
 @layer utilities {
-  .font-serif {
-    font-family: var(--font-serif);
+  .font-serif,
+  .font-display {
+    font-family: var(--font-display);
   }
   .tabular {
     font-variant-numeric: tabular-nums lining-nums;

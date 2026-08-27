@@ -79,13 +79,13 @@ export function AppShell({
       <WorkspaceSync />
       <ProjectDrawer open={projectsOpen} onClose={() => setProjectsOpen(false)} />
       <header className="no-print sticky top-0 z-30 border-b border-border bg-surface">
-        <div className="flex h-[68px] items-center gap-3 px-4 md:px-6">
+        <div className="flex items-center gap-3 px-5 py-4">
           <Link to="/" className="flex min-w-0 items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-sm bg-brand text-accent-fg">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-fg">
               <Cable className="size-5" strokeWidth={1.75} />
             </span>
             <span className="min-w-0">
-              <span className="block font-serif text-lg font-semibold leading-tight tracking-tight">{APP.name}</span>
+              <span className="block font-display text-lg font-semibold leading-tight tracking-tight">{APP.name}</span>
               <span className="hidden text-xs text-muted sm:block">{APP.subtitle}</span>
             </span>
           </Link>
@@ -113,7 +113,7 @@ export function AppShell({
             <AccountMenu />
           </div>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:hidden">
+        <nav className="flex gap-1 overflow-x-auto px-5 pb-3 md:hidden">
           {NAV.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.to;
@@ -122,8 +122,8 @@ export function AppShell({
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-sm px-3 text-sm",
-                  active ? "bg-brand text-accent-fg" : "bg-surface-2 text-muted",
+                  "inline-flex h-11 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm",
+                  active ? "bg-primary text-primary-fg" : "bg-surface-2 text-muted",
                 )}
               >
                 <Icon className="size-3.5" strokeWidth={1.75} />
@@ -132,13 +132,11 @@ export function AppShell({
             );
           })}
         </nav>
-        {strip ? <div className="px-3 pb-3 lg:hidden">{strip}</div> : null}
+        {strip ? <div className="px-5 pb-3 lg:hidden">{strip}</div> : null}
       </header>
 
       <div className="mx-auto flex max-w-[1480px]">
-        <aside className="no-print sticky top-[68px] hidden h-[calc(100dvh-68px)] w-60 shrink-0 flex-col border-r border-border bg-surface-2 p-4 md:flex">
-          <p className="mb-3 px-2 text-label font-medium uppercase tracking-[0.12em] text-muted">Projeto</p>
-          <p className="mb-4 truncate px-2 text-sm text-fg">{ready ? name : "…"}</p>
+        <aside className="no-print sticky top-[4.75rem] hidden h-[calc(100dvh-4.75rem)] w-60 shrink-0 flex-col border-r border-border bg-surface p-4 md:flex">
           <nav className="flex flex-col gap-1">
             {NAV.map((item) => {
               const Icon = item.icon;
@@ -147,8 +145,8 @@ export function AppShell({
                 <div
                   key={item.to}
                   className={cn(
-                    "flex items-center rounded-sm pr-0.5",
-                    active ? "bg-brand text-accent-fg" : "text-fg hover:bg-surface",
+                    "flex items-center rounded-lg pr-0.5",
+                    active ? "bg-primary text-primary-fg" : "text-fg hover:bg-surface-2",
                   )}
                 >
                   <Link to={item.to} className="flex h-11 min-w-0 flex-1 items-center gap-2 px-3 text-sm">
@@ -159,22 +157,25 @@ export function AppShell({
                     text={item.help}
                     className={
                       active
-                        ? "text-accent-fg/90 hover:bg-brand-hover hover:text-accent-fg"
-                        : "text-fg/70 hover:bg-brand-soft hover:text-brand"
+                        ? "text-primary-fg/90 hover:bg-brand-hover hover:text-primary-fg"
+                        : "text-fg/70 hover:bg-brand-soft hover:text-primary"
                     }
                   />
                 </div>
               );
             })}
           </nav>
-          <p className="mt-auto px-2 pb-2 text-help leading-relaxed text-subtle">{AUTHOR.line}</p>
+          <p className="mt-auto px-2 pb-2 text-help leading-relaxed text-muted">{AUTHOR.line}</p>
         </aside>
 
-        <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-4 md:p-6">
+          <p className="mb-4 truncate text-sm text-muted">{ready ? name : "…"}</p>
+          {children}
+        </main>
 
         {aside ? (
-          <aside className="no-print hidden w-[280px] shrink-0 border-l border-border bg-surface-2 lg:block">
-            <div className="sticky top-[68px] max-h-[calc(100dvh-68px)] overflow-y-auto p-5">{aside}</div>
+          <aside className="no-print hidden w-[280px] shrink-0 border-l border-border bg-surface lg:block">
+            <div className="sticky top-[4.75rem] p-5">{aside}</div>
           </aside>
         ) : null}
       </div>

@@ -1,17 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Cable, FileSpreadsheet, Folder, Printer, Save, Scale } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
-import { AccountMenu } from "@/components/auth/account-menu";
-import { WorkspaceSync } from "@/components/auth/workspace-sync";
+import { Box, Cable, Columns3, Cylinder, FileSpreadsheet, Folder, Printer, Scale } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { AppMark } from "@/components/brand/app-mark";
+import { HubMark } from "@/components/brand/hub-mark";
 import { ProjectDrawer } from "@/components/project/project-drawer";
 import { Button } from "@/components/ui/button";
 import { InfoTip } from "@/components/ui/info-tip";
-import { LoginScreen } from "@/components/auth/login-screen";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { APP, AUTHOR } from "@/lib/brand";
-import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { saveWorkspace } from "@/lib/workspace";
 
 const NAV = [
   {
@@ -19,6 +15,24 @@ const NAV = [
     label: "Circuito",
     icon: Cable,
     help: "Entradas do trecho: identificação, carga, método e fatores. O veredito à direita recalcula a cada alteração. O tipo define a seção mínima (Tab. 47).",
+  },
+  {
+    to: "/eletroduto",
+    label: "Eletroduto",
+    icon: Cylinder,
+    help: "Ocupação do eletroduto pelos Ø de catálogo. Limite 53 / 31 / 40 % conforme o número de cabos (NBR 5410 6.2.11). Pode trazer o circuito ativo.",
+  },
+  {
+    to: "/eletrocalha",
+    label: "Eletrocalha",
+    icon: Columns3,
+    help: "Seção da eletrocalha: área dos cabos ≤ 40 % e, sem tampa, camada única (Tab. 42). Método B1/B2/C/E/F conforme tipo e tampa.",
+  },
+  {
+    to: "/envelope",
+    label: "Envelope",
+    icon: Box,
+    help: "Dimensões A, B, C e D do envelope de concreto em função do Φ dos dutos. Independente do cálculo elétrico; usa o bitola do eletroduto se você enviar.",
   },
   {
     to: "/tabelas",
@@ -30,7 +44,7 @@ const NAV = [
     to: "/memoria",
     label: "Memória",
     icon: Printer,
-    help: "Memorial de cálculo para arquivo do projeto. Imprimir gera PDF pelo navegador; Copiar envia o texto.",
+    help: "Memorial de cálculo para arquivo do projeto. Imprimir gera PDF pelo navegador; Copiar envia o HTML para o Word.",
   },
   {
     to: "/norma",
@@ -39,6 +53,16 @@ const NAV = [
     help: "Premissas da NBR 5410:2004, limites de queda (6.2.7) e o que foi revisado na planilha original.",
   },
 ] as const;
+
+function Credit() {
+  return (
+    <p className="border-t border-border px-2 pt-3 text-[11px] leading-relaxed text-muted">
+      Criado por: {AUTHOR.name}
+      <br />
+      {AUTHOR.title} · CREA {AUTHOR.crea}
+    </p>
+  );
+}
 
 export function AppShell({
   children,
@@ -49,71 +73,41 @@ export function AppShell({
   aside?: ReactNode;
   strip?: ReactNode;
 }) {
-  const { user, isPending } = useCurrentUserState();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const name = useApp((s) => s.project().meta.name);
-  const setMeta = useApp((s) => s.setMeta);
   const [projectsOpen, setProjectsOpen] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [savedFlash, setSavedFlash] = useState<"ok" | "err" | null>(null);
-
-  useEffect(() => setReady(true), []);
-
-  async function save() {
-    setMeta({});
-    try {
-      const s = useApp.getState();
-      await saveWorkspace({ data: { projects: s.projects, currentId: s.currentId } });
-      setSavedFlash("ok");
-    } catch {
-      setSavedFlash("err");
-    }
-    window.setTimeout(() => setSavedFlash(null), 1800);
-  }
-
-  if (isPending) return <LoginScreen pending />;
-  if (!user) return <LoginScreen />;
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <WorkspaceSync />
       <ProjectDrawer open={projectsOpen} onClose={() => setProjectsOpen(false)} />
-      <header className="no-print sticky top-0 z-30 border-b border-border bg-surface">
-        <div className="flex items-center gap-3 px-5 py-4">
-          <Link to="/" className="flex min-w-0 items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-fg">
-              <Cable className="size-5" strokeWidth={1.75} />
-            </span>
+      <header className="no-print sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
+        <div className="mx-auto flex min-h-[68px] max-w-[90rem] items-center gap-3 px-5 py-4">
+          <Link to="/" className="flex min-w-0 items-center gap-2.5">
+            <AppMark />
             <span className="min-w-0">
-              <span className="block font-display text-lg font-semibold leading-tight tracking-tight">{APP.name}</span>
-              <span className="hidden text-xs text-muted sm:block">{APP.subtitle}</span>
+              <span className="block font-display text-lg leading-none tracking-tight">{APP.name}</span>
+              <span className="hidden truncate text-[13px] text-foreground/80 sm:block">{APP.subtitle}</span>
             </span>
           </Link>
-          <div className="ml-auto flex items-center gap-2">
-            {savedFlash === "ok" ? (
-              <span className="hidden text-xs text-ok sm:inline">Salvo na sua conta</span>
-            ) : null}
-            {savedFlash === "err" ? (
-              <span className="hidden text-xs text-danger sm:inline">Não foi possível salvar</span>
-            ) : null}
+          <div className="ml-auto flex items-center gap-1.5">
             <a
               href={APP.hubUrl}
-              className="hidden h-11 items-center px-2 text-sm text-muted hover:text-fg md:inline-flex"
+              aria-label="Voltar ao portal Engenharia Apps"
+              title="Voltar ao portal"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card pl-1.5 pr-2.5"
             >
-              Portal
+              <HubMark size={32} />
+              <span className="hidden leading-tight sm:block">
+                <span className="block font-display text-[13px] tracking-tight">{APP.hubName}</span>
+                <span className="block text-[10px] text-muted">Voltar ao portal</span>
+              </span>
             </a>
-            <Button variant="outline" onClick={() => setProjectsOpen(true)} aria-label="Projetos">
-              <Folder className="size-4" strokeWidth={1.75} />
+            <Button variant="outline" size="sm" className="h-8" onClick={() => setProjectsOpen(true)} aria-label="Projetos">
+              <Folder />
               <span className="hidden sm:inline">Projetos</span>
             </Button>
-            <Button onClick={() => void save()} aria-label="Salvar">
-              <Save className="size-4" strokeWidth={1.75} />
-              <span className="hidden sm:inline">Salvar</span>
-            </Button>
-            <AccountMenu />
           </div>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-5 pb-3 md:hidden">
+        <nav className="flex gap-1 overflow-x-auto border-t border-border px-5 py-2 lg:hidden">
           {NAV.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.to;
@@ -122,8 +116,8 @@ export function AppShell({
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "inline-flex h-11 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm",
-                  active ? "bg-primary text-primary-fg" : "bg-surface-2 text-muted",
+                  "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-4 text-sm",
+                  active ? "bg-primary text-primary-fg" : "text-muted hover:bg-surface-2",
                 )}
               >
                 <Icon className="size-3.5" strokeWidth={1.75} />
@@ -132,11 +126,16 @@ export function AppShell({
             );
           })}
         </nav>
-        {strip ? <div className="px-5 pb-3 lg:hidden">{strip}</div> : null}
+        {strip ? <div className="px-3 pb-3 lg:hidden">{strip}</div> : null}
       </header>
 
-      <div className="mx-auto flex max-w-[1480px]">
-        <aside className="no-print sticky top-[4.75rem] hidden h-[calc(100dvh-4.75rem)] w-60 shrink-0 flex-col border-r border-border bg-surface p-4 md:flex">
+      <div
+        className={cn(
+          "mx-auto grid max-w-[90rem] grid-cols-1",
+          aside ? "lg:grid-cols-[16rem_minmax(0,1fr)_16rem]" : "lg:grid-cols-[16rem_minmax(0,1fr)]",
+        )}
+      >
+        <aside className="no-print sticky top-[73px] hidden h-[calc(100dvh-73px)] flex-col overflow-y-auto border-r border-border p-3 lg:flex">
           <nav className="flex flex-col gap-1">
             {NAV.map((item) => {
               const Icon = item.icon;
@@ -145,37 +144,42 @@ export function AppShell({
                 <div
                   key={item.to}
                   className={cn(
-                    "flex items-center rounded-lg pr-0.5",
-                    active ? "bg-primary text-primary-fg" : "text-fg hover:bg-surface-2",
+                    "flex min-h-11 items-center rounded-lg pr-0.5",
+                    active ? "bg-primary text-primary-fg" : "text-fg/80 hover:bg-surface-2",
                   )}
                 >
-                  <Link to={item.to} className="flex h-11 min-w-0 flex-1 items-center gap-2 px-3 text-sm">
+                  <Link to={item.to} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-sm">
                     <Icon className="size-4 shrink-0" strokeWidth={1.75} />
                     <span className="truncate">{item.label}</span>
                   </Link>
                   <InfoTip
                     text={item.help}
+                    side="right"
                     className={
                       active
-                        ? "text-primary-fg/90 hover:bg-brand-hover hover:text-primary-fg"
-                        : "text-fg/70 hover:bg-brand-soft hover:text-primary"
+                        ? "text-primary-fg/80 hover:bg-brand-hover hover:text-primary-fg"
+                        : "text-muted hover:bg-surface-2 hover:text-fg"
                     }
                   />
                 </div>
               );
             })}
           </nav>
-          <p className="mt-auto px-2 pb-2 text-help leading-relaxed text-muted">{AUTHOR.line}</p>
+          <div className="mt-auto">
+            <Credit />
+          </div>
         </aside>
 
-        <main className="min-w-0 flex-1 p-4 md:p-6">
-          <p className="mb-4 truncate text-sm text-muted">{ready ? name : "…"}</p>
+        <main className="min-w-0 px-3 py-5 sm:px-6 sm:py-7">
           {children}
+          <div className="no-print mt-10 lg:hidden">
+            <Credit />
+          </div>
         </main>
 
         {aside ? (
-          <aside className="no-print hidden w-[280px] shrink-0 border-l border-border bg-surface lg:block">
-            <div className="sticky top-[4.75rem] p-5">{aside}</div>
+          <aside className="no-print hidden border-l border-border lg:block">
+            <div className="sticky top-[73px] max-h-[calc(100dvh-73px)] overflow-y-auto p-5">{aside}</div>
           </aside>
         ) : null}
       </div>

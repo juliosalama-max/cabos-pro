@@ -45,8 +45,8 @@ export function CircuitList({
                 type="button"
                 onClick={() => onSelect(c.id)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left",
-                  active ? "bg-brand-soft text-fg" : "hover:bg-surface-2",
+                  "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left",
+                  active ? "bg-surface-2 text-fg" : "hover:bg-surface-2",
                 )}
               >
                 <div className="min-w-0 flex-1">
@@ -57,7 +57,7 @@ export function CircuitList({
                     </span>
                   </p>
                   <p className="truncate text-help text-subtle">
-                    {KIND_LABEL[c.kind]} · {r.section ? `${r.nPerPhase}× ${r.section} mm² ${c.insulation}` : "sem seção"} ·{" "}
+                    {KIND_LABEL[c.kind]} · {r.section ? `${r.nPerPhase}× ${r.section} mm² ${c.insulation === "PVC" ? "PVC/PVC" : c.insulation}` : "sem seção"} ·{" "}
                     {c.voltage} V
                   </p>
                 </div>

@@ -19,7 +19,7 @@ export function Card({
       {kicker ? (
         <p className="mb-1 text-label font-medium uppercase tracking-[0.1em] text-muted">{kicker}</p>
       ) : null}
-      {title ? <h3 className="font-serif text-xl font-semibold tracking-tight text-fg">{title}</h3> : null}
+      {title ? <h3 className="font-serif text-lg font-semibold tracking-tight text-fg">{title}</h3> : null}
       {context ? <p className="mt-1 text-sm text-muted">{context}</p> : null}
       <div className={title || context ? "mt-4" : undefined}>{children}</div>
     </section>

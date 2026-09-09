@@ -8,6 +8,11 @@ export type InstallMethod = (typeof METHODS)[number];
 export const INSULATIONS = ["HEPR", "PVC"] as const;
 export type Insulation = (typeof INSULATIONS)[number];
 
+export const INSULATION_LABEL: Record<Insulation, string> = {
+  HEPR: "HEPR / EPR 90 °C",
+  PVC: "PVC/PVC 70 °C",
+};
+
 export const FORMATIONS = ["2x1", "1x2", "3x1", "1x3", "4x1", "1x4"] as const;
 export type Formation = (typeof FORMATIONS)[number];
 

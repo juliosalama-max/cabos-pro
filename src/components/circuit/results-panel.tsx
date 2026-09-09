@@ -2,8 +2,9 @@ import { useState } from "react";
 import { BadgeCheck, ChevronDown, OctagonAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { calculate } from "@/lib/nbr5410/calculate";
+import { dropChain } from "@/lib/nbr5410/project-calc";
 import { cableSpec, fmt, fmtA } from "@/lib/nbr5410/format";
-import type { CircuitInput } from "@/lib/nbr5410/types";
+import type { CircuitInput, OriginKind } from "@/lib/nbr5410/types";
 import { cn } from "@/lib/utils";
 
 function Row({ label, value, hint, alert }: { label: string; value: string; hint?: string; alert?: boolean }) {
@@ -18,15 +19,24 @@ function Row({ label, value, hint, alert }: { label: string; value: string; hint
   );
 }
 
-function VerdictBody({ input }: { input: CircuitInput }) {
+function VerdictBody({
+  input,
+  circuits,
+  origin,
+}: {
+  input: CircuitInput;
+  circuits?: CircuitInput[];
+  origin?: OriginKind;
+}) {
   const r = calculate(input);
+  const chain = circuits?.length ? dropChain(circuits, input.id, origin ?? "concessionaria") : null;
 
   return (
     <div className="flex flex-col gap-5">
       <header>
         <p className="text-label font-medium uppercase tracking-[0.12em] text-muted">Veredito NBR 5410</p>
-        <h2 className="mt-2 font-serif text-lg font-semibold leading-snug tracking-tight">
-          {cableSpec(r.nPerPhase, input.formation, r.section, input.insulation)}
+        <h2 className="mt-2 font-serif text-lg font-medium leading-snug tracking-tight">
+          {cableSpec(r.nPerPhase, input.formation, r.section, input.insulation, input.conductor)}
         </h2>
         <div className="mt-2">
           <Badge tone={r.ok ? "ok" : "danger"}>{r.ok ? "Conforme" : "Não conforme"}</Badge>
@@ -48,6 +58,14 @@ function VerdictBody({ input }: { input: CircuitInput }) {
           hint={`máx. ${fmt(input.maxDropPct, 0)} %`}
           alert={r.dropPct > input.maxDropPct}
         />
+        {chain ? (
+          <Row
+            label="ΔV acumulada"
+            value={`${fmt(chain.totalPct, 2)} %`}
+            hint={`${chain.path.map((p) => p.tag).join(" → ")} · teto ${fmt(chain.limit, 0)} %`}
+            alert={!chain.ok}
+          />
+        ) : null}
         <Row label="ΔV |Z|" value={`${fmt(r.dropModulusPct, 2)} %`} hint="comparação" />
         <Row label="PE" value={r.pe ? `${r.pe} mm²` : "—"} hint={`N ${r.neutral ?? "—"} mm²`} />
         <Row label="Eletroduto" value={r.conduit ?? "—"} hint={r.conduit ? `${fmt(r.conduitFillPct, 0)} % ocup.` : undefined} />
@@ -80,12 +98,16 @@ function VerdictBody({ input }: { input: CircuitInput }) {
         <dl className="mt-1">
           <Row label="Fa" value={fmt(r.fa, 2)} hint={r.faSource} />
           <Row label="Ft" value={fmt(r.ft, 2)} hint={`${input.tempC} °C`} />
+          <Row label="Fs" value={fmt(r.fs, 2)} hint="Tab. 41" />
+          <Row label="Fh" value={fmt(r.fh, 2)} hint="3ª harmônica" />
           <Row label="Fr" value={fmt(r.fr, 2)} />
           <Row label="Rca" value={`${fmt(r.rca, 3)} Ω/km`} />
           <Row label="XL" value={`${fmt(r.xl, 3)} Ω/km`} />
           <Row label="V/A·km" value={fmt(r.vakm, 3)} />
           <Row label="Icc no ponto" value={`${fmt(r.iscLocalKa, 2)} kA`} />
           <Row label="Icw cabo" value={`${fmt(r.icwKa, 1)} kA`} hint={`k = ${r.kPhase}`} />
+          <Row label="Icw PE" value={`${fmt(r.peIcwKa, 1)} kA`} />
+          <Row label="Ia (5·In)" value={fmtA(r.iaA)} hint={`t ≤ ${r.tDiscS} s`} />
         </dl>
         {r.motor ? (
           <p className="mt-3 text-help text-muted">
@@ -97,11 +119,27 @@ function VerdictBody({ input }: { input: CircuitInput }) {
   );
 }
 
-export function ResultsPanel({ input }: { input: CircuitInput }) {
-  return <VerdictBody input={input} />;
+export function ResultsPanel({
+  input,
+  circuits,
+  origin,
+}: {
+  input: CircuitInput;
+  circuits?: CircuitInput[];
+  origin?: OriginKind;
+}) {
+  return <VerdictBody input={input} circuits={circuits} origin={origin} />;
 }
 
-export function VerdictStrip({ input }: { input: CircuitInput }) {
+export function VerdictStrip({
+  input,
+  circuits,
+  origin,
+}: {
+  input: CircuitInput;
+  circuits?: CircuitInput[];
+  origin?: OriginKind;
+}) {
   const r = calculate(input);
   const [open, setOpen] = useState(false);
 
@@ -115,7 +153,7 @@ export function VerdictStrip({ input }: { input: CircuitInput }) {
         aria-label="Veredito do circuito"
       >
         <span className="min-w-0 flex-1 truncate font-serif text-sm font-semibold">
-          {cableSpec(r.nPerPhase, input.formation, r.section, input.insulation)}
+          {cableSpec(r.nPerPhase, input.formation, r.section, input.insulation, input.conductor)}
         </span>
         <Badge className="shrink-0" tone={r.ok ? "ok" : "danger"}>
           {r.ok ? "Conforme" : "Não conforme"}
@@ -135,7 +173,7 @@ export function VerdictStrip({ input }: { input: CircuitInput }) {
             onClick={() => setOpen(false)}
           />
           <div className="absolute inset-x-0 top-full z-40 mt-2 max-h-[70vh] overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-card">
-            <VerdictBody input={input} />
+            <VerdictBody input={input} circuits={circuits} origin={origin} />
           </div>
         </>
       ) : null}

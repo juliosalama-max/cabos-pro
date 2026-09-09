@@ -4,45 +4,46 @@
   --font-sans: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
   --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
   --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
-  --font-mono: "Source Sans 3", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
 
   --color-bg: #f3eee4;
   --color-background: #f3eee4;
-  --color-bg-elevated: #faf6ee;
   --color-surface: #faf6ee;
   --color-card: #faf6ee;
-  --color-surface-2: #f7f1e8;
-  --color-paper: #fffcf7;
+  --color-paper: #faf6ee;
+  --color-surface-2: #eee6d8;
   --color-fg: #1c1a16;
-  --color-ink: #1c1a16;
   --color-foreground: #1c1a16;
+  --color-ink: #1c1a16;
   --color-muted: #6b6458;
-  --color-subtle: #7a6248;
+  --color-muted-foreground: #6b6458;
+  --color-subtle: #6b6458;
   --color-brand: #1f4d45;
   --color-primary: #1f4d45;
-  --color-brand-hover: #16382d;
-  --color-brand-soft: #e4ede7;
+  --color-primary-fg: #f3eee4;
   --color-accent: #1f4d45;
   --color-accent-fg: #f3eee4;
-  --color-primary-fg: #f3eee4;
-  --color-primary-foreground: #f3eee4;
+  --color-chip: #1f4d45;
+  --color-chip-fg: #f3eee4;
   --color-border: #ddd4c4;
+  --color-input: #ddd4c4;
   --color-ok: #2f6b4f;
-  --color-live: #2f6b4f;
-  --color-ok-dim: #e4ede7;
-  --color-danger: #8b3a2f;
+  --color-ok-dim: #eee6d8;
+  --color-danger: #8f2d2d;
+  --color-destructive: #8f2d2d;
   --color-danger-dim: #f3e4e0;
   --color-warn: #7a6248;
-  --color-soon: #7a6248;
-  --color-warn-dim: #ede6da;
+  --color-warn-dim: #eee6d8;
   --color-ring: #1f4d45;
-  --color-secondary: #ede6da;
+  --color-secondary: #eee6d8;
+  --color-brand-hover: #16382d;
+  --color-brand-soft: #eee6d8;
 
   --text-label: 0.6875rem;
   --text-help: 0.8125rem;
 
-  --radius-sm: 10px;
-  --radius-md: 12px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 22px;
 
@@ -74,7 +75,8 @@
   h1,
   h2,
   h3 {
-    font-family: var(--font-display);
+    font-family: var(--font-serif);
+    font-weight: 600;
     text-wrap: balance;
   }
   p {
@@ -98,7 +100,7 @@
 @layer utilities {
   .font-serif,
   .font-display {
-    font-family: var(--font-display);
+    font-family: var(--font-serif);
   }
   .tabular {
     font-variant-numeric: tabular-nums lining-nums;

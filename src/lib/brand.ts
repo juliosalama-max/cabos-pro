@@ -6,8 +6,11 @@ export const AUTHOR = {
 } as const;
 
 export const APP = {
-  name: "Condutores",
-  subtitle: "Dimensionamento · NBR 5410:2004",
+  name: "CABOS Pro",
+  subtitle: "Dimensionamento · NBR 5410",
   hubName: "Engenharia Apps",
-  hubUrl: "https://engenharia-apps.grok.me",
+  hubUrl: "https://engenharia-apps.vercel.app",
 } as const;
+
+export const BACKUP_KEY = "cabos-pro-backup";
+export const PERSIST_KEY = "cabos-pro-v1";

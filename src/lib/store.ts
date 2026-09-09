@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { BACKUP_KEY, PERSIST_KEY } from "@/lib/brand";
+import { defaultEnvelope, type EnvelopeState } from "@/lib/install/envelope";
+import { defaultOccupy, type OccupyState } from "@/lib/install/occupy";
+import { defaultTray, type TrayState } from "@/lib/install/tray";
 import {
   EXAMPLE_FEEDER,
   defaultCircuit,
@@ -17,6 +21,7 @@ const defaultMeta = (): ProjectMeta => ({
   crea: "",
   notes: "Projeto inicial com o circuito da planilha de dimensionamento.",
   updatedAt: new Date().toISOString(),
+  origin: "concessionaria",
 });
 
 function demoProject(): Project {
@@ -73,6 +78,36 @@ function demoProject(): Project {
     meta: defaultMeta(),
     circuits: [EXAMPLE_FEEDER, motor, lighting],
     activeId: EXAMPLE_FEEDER.id,
+    occupy: defaultOccupy(),
+    envelope: defaultEnvelope(),
+    tray: defaultTray(),
+  };
+}
+
+function hydrateCircuit(c: CircuitInput): CircuitInput {
+  return {
+    ...defaultCircuit({ id: c.id }),
+    ...c,
+    parentId: c.parentId ?? null,
+    harmonic3Pct: c.harmonic3Pct ?? 0,
+    conductor: c.conductor ?? "Cu",
+    soilRho: c.soilRho ?? 2.5,
+    conduitBends: c.conduitBends ?? 0,
+    tugPoints: c.tugPoints ?? 0,
+    tugWetPoints: c.tugWetPoints ?? 0,
+    areaM2: c.areaM2 ?? 0,
+    groupingOverride: c.groupingOverride ?? null,
+  };
+}
+
+function hydrate(p: Project): Project {
+  return {
+    ...p,
+    meta: { ...p.meta, origin: p.meta.origin ?? "concessionaria" },
+    circuits: (p.circuits ?? []).map(hydrateCircuit),
+    occupy: p.occupy?.rows?.length ? { ...defaultOccupy(), ...p.occupy } : defaultOccupy(),
+    envelope: p.envelope?.grid?.length ? p.envelope : defaultEnvelope(),
+    tray: p.tray?.rows?.length ? { ...defaultTray(), ...p.tray } : defaultTray(),
   };
 }
 
@@ -92,8 +127,13 @@ interface AppState {
   loadProject: (id: string) => void;
   saveAs: (name: string) => void;
   deleteProject: (id: string) => void;
+  setOccupy: (patch: Partial<OccupyState> | ((cur: OccupyState) => OccupyState)) => void;
+  setEnvelope: (patch: Partial<EnvelopeState> | ((cur: EnvelopeState) => EnvelopeState)) => void;
+  setTray: (patch: Partial<TrayState> | ((cur: TrayState) => TrayState)) => void;
   importJson: (raw: string) => boolean;
   exportJson: () => void;
+  exportWorkspace: () => void;
+  restoreBackup: () => boolean;
   replaceWorkspace: (projects: Project[], currentId: string, ownerId: string) => void;
   resetDemo: (ownerId: string) => void;
 }
@@ -110,7 +150,10 @@ export const useApp = create<AppState>()(
         projects: [seed],
         currentId: seed.id,
         ownerId: null,
-        project: () => get().projects.find((p) => p.id === get().currentId) ?? get().projects[0],
+        project: () => {
+          const raw = get().projects.find((p) => p.id === get().currentId) ?? get().projects[0];
+          return raw;
+        },
         active: () => {
           const p = get().project();
           return p.circuits.find((c) => c.id === p.activeId) ?? p.circuits[0];
@@ -166,6 +209,33 @@ export const useApp = create<AppState>()(
           set((s) => ({
             projects: s.projects.map((p) => (p.id === s.currentId ? { ...p, activeId: id } : p)),
           })),
+        setOccupy: (patch) =>
+          set((s) => ({
+            projects: s.projects.map((p) => {
+              if (p.id !== s.currentId) return p;
+              const cur = hydrate(p).occupy;
+              const occupy = typeof patch === "function" ? patch(cur) : { ...cur, ...patch };
+              return touch({ ...p, occupy });
+            }),
+          })),
+        setEnvelope: (patch) =>
+          set((s) => ({
+            projects: s.projects.map((p) => {
+              if (p.id !== s.currentId) return p;
+              const cur = hydrate(p).envelope;
+              const envelope = typeof patch === "function" ? patch(cur) : { ...cur, ...patch };
+              return touch({ ...p, envelope });
+            }),
+          })),
+        setTray: (patch) =>
+          set((s) => ({
+            projects: s.projects.map((p) => {
+              if (p.id !== s.currentId) return p;
+              const cur = hydrate(p).tray;
+              const tray = typeof patch === "function" ? patch(cur) : { ...cur, ...patch };
+              return touch({ ...p, tray });
+            }),
+          })),
         newProject: () => {
           const p: Project = {
             id: newId(),
@@ -176,6 +246,9 @@ export const useApp = create<AppState>()(
             },
             circuits: [defaultCircuit()],
             activeId: "",
+            occupy: defaultOccupy(),
+            envelope: defaultEnvelope(),
+            tray: defaultTray(),
           };
           p.activeId = p.circuits[0].id;
           set((s) => ({ projects: [p, ...s.projects], currentId: p.id }));
@@ -210,16 +283,70 @@ export const useApp = create<AppState>()(
           a.click();
           URL.revokeObjectURL(a.href);
         },
+        exportWorkspace: () => {
+          const { projects, currentId } = get();
+          const blob = new Blob(
+            [JSON.stringify({ app: "CABOS Pro", projects, currentId }, null, 2)],
+            { type: "application/json" },
+          );
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "cabos-pro.json";
+          a.click();
+          URL.revokeObjectURL(a.href);
+        },
         importJson: (raw) => {
           try {
-            const data = JSON.parse(raw) as Project;
-            if (!data?.meta || !Array.isArray(data.circuits) || data.circuits.length === 0) return false;
+            const data = JSON.parse(raw) as {
+              state?: { projects?: Project[]; currentId?: string };
+              projects?: Project[];
+              currentId?: string;
+              meta?: Project["meta"];
+              circuits?: CircuitInput[];
+            };
+            const packed = data.state ?? data;
+            if (Array.isArray(packed.projects) && packed.projects.length) {
+              const projects = packed.projects.map(hydrate);
+              const currentId =
+                packed.currentId && projects.some((p) => p.id === packed.currentId)
+                  ? packed.currentId
+                  : projects[0].id;
+              set({ projects, currentId });
+              return true;
+            }
+            if (!data.meta || !Array.isArray(data.circuits) || data.circuits.length === 0) return false;
             const p: Project = {
-              ...data,
               id: newId(),
-              meta: { ...data.meta, updatedAt: new Date().toISOString() },
+              meta: { ...data.meta, updatedAt: new Date().toISOString(), origin: data.meta.origin ?? "concessionaria" },
+              circuits: data.circuits.map(hydrateCircuit),
+              activeId: data.circuits[0].id,
+              occupy: defaultOccupy(),
+              envelope: defaultEnvelope(),
+              tray: defaultTray(),
             };
             set((s) => ({ projects: [p, ...s.projects], currentId: p.id }));
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        restoreBackup: () => {
+          try {
+            const raw = localStorage.getItem(BACKUP_KEY) ?? localStorage.getItem(PERSIST_KEY);
+            if (!raw) return false;
+            const parsed = JSON.parse(raw) as {
+              state?: { projects?: Project[]; currentId?: string };
+              projects?: Project[];
+              currentId?: string;
+            };
+            const packed = parsed.state ?? parsed;
+            if (!Array.isArray(packed.projects) || packed.projects.length === 0) return false;
+            const projects = packed.projects.map(hydrate);
+            const currentId =
+              packed.currentId && packed.projects.some((p) => p.id === packed.currentId)
+                ? packed.currentId
+                : packed.projects[0].id;
+            set({ projects, currentId });
             return true;
           } catch {
             return false;
@@ -237,12 +364,44 @@ export const useApp = create<AppState>()(
       };
     },
     {
-      name: "cabos-pro-v1",
+      name: PERSIST_KEY,
+      storage: createJSONStorage(() => ({
+        getItem: (name) => localStorage.getItem(name),
+        setItem: (name, value) => {
+          localStorage.setItem(name, value);
+          try {
+            localStorage.setItem(BACKUP_KEY, value);
+          } catch {
+            /* quota */
+          }
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      })),
       partialize: (s: AppState) => ({
         projects: s.projects,
         currentId: s.currentId,
         ownerId: s.ownerId,
       }),
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<AppState>;
+        const projects = (p.projects ?? current.projects).map(hydrate);
+        const currentId =
+          p.currentId && projects.some((x) => x.id === p.currentId) ? p.currentId : projects[0]?.id ?? current.currentId;
+        return {
+          ...current,
+          ...p,
+          projects,
+          currentId,
+          ownerId: p.ownerId ?? current.ownerId,
+        };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const projects = state.projects.map(hydrate);
+        if (projects.some((p, i) => p !== state.projects[i])) {
+          state.projects = projects;
+        }
+      },
     },
   ),
 );

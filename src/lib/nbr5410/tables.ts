@@ -13,6 +13,7 @@ export {
   SECTIONS,
   METHODS,
   INSULATIONS,
+  INSULATION_LABEL,
   FORMATIONS,
 } from "./tables-data";
 export type {

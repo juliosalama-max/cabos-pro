@@ -1,6 +1,6 @@
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
-import type { ProjectMeta } from "@/lib/nbr5410/types";
+import type { OriginKind, ProjectMeta } from "@/lib/nbr5410/types";
 
 export function ProjectHeader({
   meta,
@@ -33,6 +33,18 @@ export function ProjectHeader({
           info="Nome do profissional que assina o memorial. Não é preenchido automaticamente — informe o responsável pela obra."
         >
           <Input value={meta.responsible} onChange={(e) => onChange({ responsible: e.target.value })} />
+        </Field>
+        <Field
+          label="Origem da instalação"
+          info="NBR 5410 6.2.7: concessionária → 4 % até o ponto de uso. Transformador/gerador do consumidor → 5 % em iluminação e 7 % nos demais. A queda acumulada (alimentador + ramal) usa este teto."
+        >
+          <Select
+            value={meta.origin ?? "concessionaria"}
+            onChange={(e) => onChange({ origin: e.target.value as OriginKind })}
+          >
+            <option value="concessionaria">Concessionária (teto 4 %)</option>
+            <option value="transformador">Transformador / gerador (5 % / 7 %)</option>
+          </Select>
         </Field>
         <Field label="CREA" info="Número do CREA do responsável técnico desta obra.">
           <Input value={meta.crea} onChange={(e) => onChange({ crea: e.target.value })} />

@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { AMPACITY, METHODS, METHOD_INFO, TEMP_FACTOR, GROUP_A_TO_F, GROUP_E_F, IMPEDANCE } from "@/lib/nbr5410/tables";
+import { AMPACITY, METHODS, METHOD_INFO, TEMP_FACTOR, GROUP_A_TO_F, GROUP_E_F, GROUP_C_SPACED, IMPEDANCE } from "@/lib/nbr5410/tables";
 import { SECTIONS } from "@/lib/nbr5410/tables-data";
 import type { Insulation, InstallMethod } from "@/lib/nbr5410/tables-data";
+import { soilFactor, SOIL_RHO } from "@/lib/nbr5410/extras";
 import { Field, Select } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
 
@@ -125,6 +126,14 @@ export function TablesView() {
                   </td>
                 ))}
               </tr>
+              <tr className="border-b border-border/60">
+                <td className="px-4 py-2 text-muted">C (espaçados)</td>
+                {GROUP_C_SPACED.slice(1).map((v, i) => (
+                  <td key={i} className="px-2 py-2 text-center">
+                    {v}
+                  </td>
+                ))}
+              </tr>
               <tr>
                 <td className="px-4 py-2 text-muted">E e F</td>
                 {GROUP_E_F.slice(1).map((v, i) => (
@@ -133,6 +142,30 @@ export function TablesView() {
                   </td>
                 ))}
               </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card
+        title="Solo — Tabela 41"
+        context="Fator Fs para o método D em função da resistividade térmica. Referência 2,5 K·m/W = 1,00."
+      >
+        <div className="overflow-x-auto rounded-md border border-border">
+          <table className="w-full min-w-[400px] text-sm">
+            <thead className="text-left text-label uppercase tracking-[0.1em] text-muted">
+              <tr className="border-b border-border">
+                <th className="px-4 py-3">ρ (K·m/W)</th>
+                <th className="px-4 py-3">Fs</th>
+              </tr>
+            </thead>
+            <tbody className="tabular">
+              {SOIL_RHO.map((rho) => (
+                <tr key={rho} className="border-b border-border/60">
+                  <td className="px-4 py-2">{String(rho).replace(".", ",")}</td>
+                  <td className="px-4 py-2">{soilFactor(rho).fs.toFixed(2).replace(".", ",")}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

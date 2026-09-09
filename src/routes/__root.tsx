@@ -16,6 +16,15 @@ export const Route = createRootRoute({
         content:
           "Dimensionamento de condutores conforme ABNT NBR 5410:2004 — capacidade de corrente, queda de tensão e curto-circuito.",
       },
+      { property: "og:title", content: `${APP.name} · Engenharia Apps` },
+      { property: "og:description", content: `${APP.subtitle} — seção, queda de tensão e capacidade de condução.` },
+      { property: "og:image", content: "/og.jpg" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: `${APP.name} · Engenharia Apps` },
+      { name: "twitter:image", content: "/og.jpg" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },

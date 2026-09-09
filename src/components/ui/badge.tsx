@@ -13,9 +13,9 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-label font-medium tracking-[0.08em] uppercase",
-        tone === "ok" && "bg-brand text-accent-fg",
-        tone === "danger" && "bg-danger text-accent-fg",
+        "inline-flex items-center rounded-full px-2 py-px text-[10px] font-medium leading-4 tracking-wide",
+        tone === "ok" && "bg-ok text-primary-fg",
+        tone === "danger" && "bg-danger text-primary-fg",
         tone === "warn" && "bg-warn-dim text-warn",
         tone === "neutral" && "bg-secondary text-muted",
         className,

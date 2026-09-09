@@ -1,7 +1,8 @@
-import { Download, FolderPlus, Trash2, Upload } from "lucide-react";
-import { useRef } from "react";
+import { Download, FolderPlus, RotateCcw, Trash2, Upload } from "lucide-react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
+import { BACKUP_KEY } from "@/lib/brand";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -15,10 +16,17 @@ export function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () =>
   const remove = useApp((s) => s.deleteProject);
   const saveAs = useApp((s) => s.saveAs);
   const importJson = useApp((s) => s.importJson);
-  const exportJson = useApp((s) => s.exportJson);
+  const exportWorkspace = useApp((s) => s.exportWorkspace);
+  const restoreBackup = useApp((s) => s.restoreBackup);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [flash, setFlash] = useState<string | null>(null);
 
   if (!open) return null;
+
+  function ping(msg: string) {
+    setFlash(msg);
+    window.setTimeout(() => setFlash(null), 1800);
+  }
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -27,13 +35,13 @@ export function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () =>
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
             <h2 className="font-serif text-lg font-semibold">Projetos</h2>
-            <p className="text-xs text-muted">Salvos na sua conta</p>
+            <p className="text-xs text-muted">Salvos neste navegador · pasta → circuitos</p>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Fechar
           </Button>
         </div>
-        <div className="flex gap-2 px-5 py-3">
+        <div className="flex flex-wrap gap-2 px-5 py-3">
           <Button
             size="sm"
             onClick={() => {
@@ -46,11 +54,19 @@ export function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () =>
           <Button size="sm" variant="secondary" onClick={() => saveAs(`${currentName} (cópia)`)}>
             Duplicar
           </Button>
-          <Button size="sm" variant="ghost" onClick={exportJson} aria-label="Baixar JSON">
-            <Download className="size-3.5" />
+          <Button size="sm" variant="outline" onClick={exportWorkspace}>
+            <Download className="size-3.5" /> Baixar cópia
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()}>
-            <Upload className="size-3.5" />
+          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+            <Upload className="size-3.5" /> Importar
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => ping(restoreBackup() ? "Cópia de segurança restaurada" : "Nenhuma cópia de segurança")}
+            title={BACKUP_KEY}
+          >
+            <RotateCcw className="size-3.5" /> Restaurar segurança
           </Button>
           <input
             ref={fileRef}
@@ -60,10 +76,11 @@ export function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () =>
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (!f) return;
-              f.text().then((t) => importJson(t));
+              f.text().then((t) => ping(importJson(t) ? "Importado" : "JSON inválido"));
             }}
           />
         </div>
+        {flash ? <p className="px-5 text-xs text-ok">{flash}</p> : null}
         <ul className="flex-1 overflow-auto px-3 pb-6">
           {projects.map((p) => (
             <li key={p.id}>
@@ -89,7 +106,7 @@ export function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () =>
                   <span
                     role="button"
                     tabIndex={0}
-                    className="grid size-8 place-items-center text-subtle hover:text-danger"
+                    className="grid size-8 place-items-center text-muted hover:text-danger"
                     onClick={(ev) => {
                       ev.stopPropagation();
                       remove(p.id);
@@ -103,7 +120,7 @@ export function ProjectDrawer({ open, onClose }: { open: boolean; onClose: () =>
           ))}
         </ul>
         <div className="border-t border-border px-5 py-3">
-          <p className="mb-2 text-label text-subtle">Renomear projeto atual</p>
+          <p className="mb-2 text-label text-muted">Renomear projeto atual</p>
           <Input value={currentName} onChange={(e) => setMeta({ name: e.target.value })} />
         </div>
       </aside>

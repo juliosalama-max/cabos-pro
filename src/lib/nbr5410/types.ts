@@ -1,3 +1,6 @@
+import type { EnvelopeState } from "@/lib/install/envelope";
+import type { OccupyState } from "@/lib/install/occupy";
+import type { TrayState } from "@/lib/install/tray";
 import type { Formation, InstallMethod, Insulation } from "./tables-data";
 
 export type { Formation, InstallMethod, Insulation };
@@ -5,6 +8,8 @@ export type LoadType = "kva" | "kw" | "cv" | "ib";
 export type CircuitKind = "iluminacao" | "tug" | "tue" | "motor" | "alimentador" | "comando";
 export type DropMethod = "nbr" | "modulus";
 export type Phases = 1 | 2 | 3;
+export type ConductorMetal = "Cu" | "Al";
+export type OriginKind = "concessionaria" | "transformador";
 
 export interface CircuitInput {
   id: string;
@@ -37,6 +42,14 @@ export interface CircuitInput {
   layers: number;
   reserveEnabled: boolean;
   notes: string;
+  parentId: string | null;
+  harmonic3Pct: number;
+  conductor: ConductorMetal;
+  soilRho: number;
+  conduitBends: number;
+  tugPoints: number;
+  tugWetPoints: number;
+  areaM2: number;
 }
 
 export interface Check {
@@ -89,6 +102,12 @@ export interface CircuitResult {
   ok: boolean;
   limiting: string;
   copperKgPerKm: number;
+  fh: number;
+  fs: number;
+  peIcwKa: number;
+  inNeutral: number;
+  iaA: number;
+  tDiscS: number;
 }
 
 export interface ProjectMeta {
@@ -99,6 +118,7 @@ export interface ProjectMeta {
   crea: string;
   notes: string;
   updatedAt: string;
+  origin: OriginKind;
 }
 
 export interface Project {
@@ -106,6 +126,9 @@ export interface Project {
   meta: ProjectMeta;
   circuits: CircuitInput[];
   activeId: string;
+  occupy: OccupyState;
+  envelope: EnvelopeState;
+  tray: TrayState;
 }
 
 export const KIND_LABEL: Record<CircuitKind, string> = {
@@ -153,6 +176,14 @@ export function defaultCircuit(partial?: Partial<CircuitInput>): CircuitInput {
     layers: 1,
     reserveEnabled: true,
     notes: "",
+    parentId: null,
+    harmonic3Pct: 0,
+    conductor: "Cu",
+    soilRho: 2.5,
+    conduitBends: 0,
+    tugPoints: 0,
+    tugWetPoints: 0,
+    areaM2: 0,
     ...partial,
   };
 }
@@ -189,4 +220,12 @@ export const EXAMPLE_FEEDER: CircuitInput = {
   reserveEnabled: true,
   notes:
     "Circuito de referência da planilha (150 kVA · 480 V · 320 m). Dimensionado com R cosφ + X senφ (NBR 5410). A planilha original usava |Z| e chegava a 240 mm².",
+  parentId: null,
+  harmonic3Pct: 0,
+  conductor: "Cu",
+  soilRho: 2.5,
+  conduitBends: 0,
+  tugPoints: 0,
+  tugWetPoints: 0,
+  areaM2: 0,
 };

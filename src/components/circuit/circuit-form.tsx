@@ -1,9 +1,10 @@
 import { MOTORS, METHOD_INFO, FORMATION_INFO, METHODS, FORMATIONS, findMotor, findMotorByCv } from "@/lib/nbr5410/tables";
 import { consultPowerKw } from "@/lib/nbr5410/calculate";
 import { fmt } from "@/lib/nbr5410/format";
-import type { CircuitInput, CircuitKind, Formation, InstallMethod, Insulation, LoadType, Phases } from "@/lib/nbr5410/types";
-import { Field, Input, Readout, Select, Textarea } from "@/components/ui/field";
+import type { CircuitInput, CircuitKind, ConductorMetal, Formation, InstallMethod, Insulation, LoadType, Phases } from "@/lib/nbr5410/types";
 import { Card } from "@/components/ui/card";
+import { Field, Input, Readout, Select, Textarea } from "@/components/ui/field";
+import { lightingDemandW, tugDemandVa } from "@/lib/nbr5410/extras";
 
 const KINDS: CircuitKind[] = ["alimentador", "motor", "iluminacao", "tug", "tue", "comando"];
 const KIND_L: Record<CircuitKind, string> = {
@@ -20,6 +21,13 @@ const INFO = {
   kind: "Classificação NBR 5410. Define a seção mínima (Tab. 47): iluminação 1,5 mm²; TUG, TUE, motor e alimentador 2,5 mm²; comando 0,5 mm².\n\nTUG — tomadas de uso geral: equipamentos portáteis até 10 A (TV, computador, carregador). Demanda típica 100 VA por ponto; em cozinha, área de serviço e similares, 3 pontos a 600 VA e o restante a 100 VA.\n\nTUE — tomadas de uso específico: circuito dedicado a um aparelho (chuveiro, ar-condicionado, forno, máquina de lavar), em geral acima de 10 A.",
   from: "Origem do trecho (quadro, CCM, barramento). Só identificação — não entra em fórmula.",
   to: "Destino do trecho (carga, quadro a jusante). Só identificação — não entra em fórmula.",
+  parent: "Trecho a montante na queda acumulada (6.2.7). A ΔV deste circuito soma com a do alimentador até a origem.",
+  metal: "Cobre (tabelas NBR) ou alumínio (Imax ≈ 0,78 da tabela Cu; k = 76 PVC / 94 HEPR; seção mínima 16 mm²).",
+  h3: "Parcela de 3ª harmônica da corrente de fase. ≥ 15 %: fator 0,86 e neutro carregado (6.2.6). > 33 %: dimensionar também pelo neutro.",
+  soil: "Tabela 41. Referência 2,5 K·m/W = 1,00. Só no método D.",
+  bends: "Curvas de 90° no trecho de eletroduto sem caixa. Máximo 3 (270°). Cada curva reduz 3 m do limite de 15 m (interno).",
+  tugN: "Número de tomadas de uso geral. Demanda NBR: 100 VA por ponto; em cozinha/área de serviço, até 3 pontos a 600 VA.",
+  area: "Área iluminada em m². Demanda típica residencial 15 W/m² (ajuste no kW/kVA se o projeto usar outro índice).",
   loadType:
     "Grandeza usada para obter a corrente de projeto Ib.\n\n• kVA — potência aparente. Ib = S / (√3·V) trifásico ou S/V monofásico. FP e η não entram em Ib.\n• kW — potência ativa. Ib = P / (√3·V·FP·η).\n• cv — 1 cv = 736 W. Ib como em kW.\n• Corrente Ib — informa a corrente diretamente.",
   kva: "Potência aparente S em kVA. Em trifásico, Ib = 1000·S / (√3·V). O kW ao lado é só consulta (S × FP × η em motor, S × FP nos demais).",
@@ -34,7 +42,7 @@ const INFO = {
   eta: "Rendimento η. Só reduz Ib quando a entrada é kW ou cv (potência no eixo do motor). Com kVA a corrente já é aparente e η não entra.",
   length: "Comprimento do trecho, em metros. Entra na queda de tensão e na impedância usada para o Icc no ponto de utilização.",
   method: "Método de instalação da NBR 5410 (Tab. 33 a 36). Define a capacidade de condução Imax do cabo.",
-  insulation: "PVC 70 °C (fator k térmico = 115) ou HEPR/EPR 90 °C (k = 143). Afeta Imax, Ft e a suportabilidade ao curto (Icw = k·S/√t).",
+  insulation: "PVC/PVC 70 °C (Sintenax, k térmico = 115) ou HEPR/EPR 90 °C (Eprotenax, k = 143). Afeta Imax, Ft e a suportabilidade ao curto (Icw = k·S/√t).",
   formation: "Unipolar ou multipolar. Define a coluna de ampacity, Rca/XL e o número de cabos no eletroduto.",
   temp: "Temperatura ambiente (ar) ou do solo (método D). Fator Ft da Tab. 40. Referência: 30 °C no ar e 20 °C no solo (Ft = 1,00).",
   nCirc: "Número de circuitos agrupados. Fator Fa da Tab. 13 (ou Tab. 16/17 se dutos enterrados).",
@@ -53,9 +61,11 @@ const INFO = {
 export function CircuitForm({
   value,
   onChange,
+  circuits,
 }: {
   value: CircuitInput;
   onChange: (patch: Partial<CircuitInput>) => void;
+  circuits?: CircuitInput[];
 }) {
   function set<K extends keyof CircuitInput>(key: K, v: CircuitInput[K]) {
     onChange({ [key]: v } as Partial<CircuitInput>);
@@ -106,6 +116,19 @@ export function CircuitForm({
           </Field>
           <Field label="Para" info={INFO.to}>
             <Input value={value.to} onChange={(e) => set("to", e.target.value)} />
+          </Field>
+          <Field label="Trecho a montante" info={INFO.parent} className="sm:col-span-2">
+            <Select
+              value={value.parentId ?? ""}
+              onChange={(e) => set("parentId", e.target.value || null)}
+            >
+              <option value="">Origem da instalação (este é o primeiro trecho)</option>
+              {(circuits ?? []).filter((c) => c.id !== value.id).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.tag} · {c.from} → {c.to}
+                </option>
+              ))}
+            </Select>
           </Field>
         </div>
       </Card>
@@ -275,6 +298,74 @@ export function CircuitForm({
         </div>
       </Card>
 
+      {value.kind === "tug" || value.kind === "iluminacao" ? (
+        <Card title="Demanda" context="Atalho da NBR para montar Ib.">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {value.kind === "tug" ? (
+              <>
+                <Field label="Pontos TUG" info={INFO.tugN}>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={value.tugPoints || ""}
+                    onChange={(e) => set("tugPoints", Number(e.target.value))}
+                  />
+                </Field>
+                <Field label="Pontos 600 VA" info={INFO.tugN}>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="3"
+                    value={value.tugWetPoints || ""}
+                    onChange={(e) => set("tugWetPoints", Number(e.target.value))}
+                  />
+                </Field>
+                {value.tugPoints > 0 ? (
+                  <p className="text-help text-muted sm:col-span-2">
+                    Demanda {tugDemandVa(value.tugPoints, value.tugWetPoints ?? 0)} VA ·{" "}
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() =>
+                        onChange({
+                          loadType: "kva",
+                          powerKva: tugDemandVa(value.tugPoints, value.tugWetPoints ?? 0) / 1000,
+                        })
+                      }
+                    >
+                      usar como kVA
+                    </button>
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Field label="Área (m²)" info={INFO.area}>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={value.areaM2 || ""}
+                    onChange={(e) => set("areaM2", Number(e.target.value))}
+                  />
+                </Field>
+                {value.areaM2 > 0 ? (
+                  <p className="text-help text-muted">
+                    15 W/m² → {lightingDemandW(value.areaM2) / 1000} kW ·{" "}
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => onChange({ loadType: "kw", powerKw: lightingDemandW(value.areaM2) / 1000 })}
+                    >
+                      usar como kW
+                    </button>
+                  </p>
+                ) : null}
+              </>
+            )}
+          </div>
+        </Card>
+      ) : null}
+
       <Card
         title="Instalação"
         context="Método NBR, isolação e agrupamento. Definem Imax, Fa e Ft (Tab. 33–36, 13, 14, 40)."
@@ -292,7 +383,13 @@ export function CircuitForm({
           <Field label="Isolação" info={INFO.insulation}>
             <Select value={value.insulation} onChange={(e) => set("insulation", e.target.value as Insulation)}>
               <option value="HEPR">HEPR / EPR 90 °C</option>
-              <option value="PVC">PVC 70 °C</option>
+              <option value="PVC">PVC/PVC 70 °C</option>
+            </Select>
+          </Field>
+          <Field label="Condutor" info={INFO.metal}>
+            <Select value={value.conductor ?? "Cu"} onChange={(e) => set("conductor", e.target.value as ConductorMetal)}>
+              <option value="Cu">Cobre</option>
+              <option value="Al">Alumínio</option>
             </Select>
           </Field>
           <Field label="Formação" info={INFO.formation}>
@@ -313,9 +410,17 @@ export function CircuitForm({
               min="1"
               max="20"
               value={value.nCircuits}
-              onChange={(e) => set("nCircuits", Number(e.target.value))}
+              onChange={(e) => onChange({ nCircuits: Number(e.target.value), groupingOverride: null })}
             />
           </Field>
+          {value.groupingOverride ? (
+            <p className="text-help text-muted sm:col-span-2">
+              Fa informado {fmt(value.groupingOverride, 2)} (eletrocalha ou valor manual).{" "}
+              <button type="button" className="underline" onClick={() => set("groupingOverride", null)}>
+                usar Tabela 13
+              </button>
+            </p>
+          ) : null}
           <Field label="Camadas (Tab. 14)" info={INFO.layers}>
             <Select value={String(value.layers)} onChange={(e) => set("layers", Number(e.target.value))}>
               <option value="1">1 (não aplica)</option>
@@ -348,8 +453,33 @@ export function CircuitForm({
                   <option value="1">1,0 m</option>
                 </Select>
               </Field>
+              <Field label="ρ solo (K·m/W)" info={INFO.soil} className="sm:col-span-2">
+                <Select
+                  value={String(value.soilRho ?? 2.5)}
+                  onChange={(e) => set("soilRho", Number(e.target.value))}
+                >
+                  <option value="1">1,0 · Fs 1,18</option>
+                  <option value="1.5">1,5 · Fs 1,10</option>
+                  <option value="2">2,0 · Fs 1,05</option>
+                  <option value="2.5">2,5 · Fs 1,00 (referência)</option>
+                  <option value="3">3,0 · Fs 0,96</option>
+                </Select>
+              </Field>
             </>
           ) : null}
+          {(value.method === "A1" || value.method === "A2" || value.method === "B1" || value.method === "B2") && (
+            <Field label="Curvas 90° sem caixa" info={INFO.bends} className="sm:col-span-2">
+              <Select
+                value={String(value.conduitBends ?? 0)}
+                onChange={(e) => set("conduitBends", Number(e.target.value))}
+              >
+                <option value="0">0</option>
+                <option value="1">1 (−3 m)</option>
+                <option value="2">2 (−6 m)</option>
+                <option value="3">3 (−9 m · máximo)</option>
+              </Select>
+            </Field>
+          )}
         </div>
         <p className="mt-3 text-help text-muted">{METHOD_INFO[value.method].desc}</p>
       </Card>
@@ -387,6 +517,19 @@ export function CircuitForm({
               value={value.iscTimeS.toFixed(3)}
               onChange={(e) => set("iscTimeS", Number(e.target.value))}
             />
+          </Field>
+          <Field label="3ª harmônica (%)" info={INFO.h3}>
+            <Select
+              value={String(value.harmonic3Pct ?? 0)}
+              onChange={(e) => set("harmonic3Pct", Number(e.target.value))}
+            >
+              <option value="0">0 % (desprezível)</option>
+              <option value="15">15 %</option>
+              <option value="25">25 %</option>
+              <option value="33">33 %</option>
+              <option value="45">45 %</option>
+              <option value="60">60 %</option>
+            </Select>
           </Field>
           <Field label="Fator de reserva (motores)" info={INFO.reserve} className="sm:col-span-2">
             <Select

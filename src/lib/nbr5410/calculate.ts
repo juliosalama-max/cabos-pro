@@ -4,6 +4,7 @@ import {
   CURRENT_TRANSFORMERS,
   FORMATION_INFO,
   K_PHASE,
+  K_PE_ISOLATED,
   METHOD_INFO,
   MIN_SECTION,
   ampacityOf,
@@ -19,7 +20,19 @@ import {
   CONDUITS,
 } from "./tables";
 import { SECTIONS } from "./tables-data";
+import { odOf } from "@/lib/install/occupy";
 import type { CircuitInput, CircuitResult, Check } from "./types";
+import {
+  alAmpacityFactor,
+  alK,
+  alPeK,
+  conduitRunLimit,
+  disconnectTimeS,
+  harmonicAdjust,
+  magneticIa,
+  minSectionAl,
+  soilFactor,
+} from "./extras";
 
 const SQRT3 = Math.sqrt(3);
 
@@ -84,13 +97,16 @@ function loadedConductors(input: CircuitInput): 2 | 3 {
   return input.phases === 3 ? 3 : 2;
 }
 
+function breakerFits(ib: number, iz: number, breaker: number): boolean {
+  return ib <= breaker + 1e-6 && breaker <= iz + 1e-6;
+}
+
 function pickBreaker(ib: number, iz: number, motorBreaker?: number): number {
-  if (motorBreaker && motorBreaker >= ib - 1e-6 && motorBreaker <= iz + 1e-6) {
-    return motorBreaker;
-  }
-  const target = ib * 1.05;
-  const candidates = BREAKERS.filter((b) => b >= target - 1e-9 && b <= iz + 1e-6);
-  if (candidates.length) return candidates[0];
+  if (motorBreaker && breakerFits(ib, iz, motorBreaker)) return motorBreaker;
+  const withMargin = BREAKERS.filter((b) => b >= ib * 1.05 - 1e-9 && b <= iz + 1e-6);
+  if (withMargin.length) return withMargin[0];
+  const inWindow = BREAKERS.filter((b) => b >= ib - 1e-9 && b <= iz + 1e-6);
+  if (inWindow.length) return inWindow[0];
   const aboveIb = BREAKERS.filter((b) => b >= ib);
   return aboveIb[0] ?? BREAKERS[BREAKERS.length - 1];
 }
@@ -121,18 +137,20 @@ function sizeConduit(
   section: number,
   formation: CircuitInput["formation"],
   nPerPhase: number,
-): { nps: string | null; fillPct: number; od: number | null } {
-  const od = cableOd(section, formation);
-  if (!od) return { nps: null, fillPct: 0, od: null };
+  insulation: CircuitInput["insulation"],
+): { nps: string | null; fillPct: number; od: number | null; conductors: number } {
   const info = FORMATION_INFO[formation];
-  const nCables = info.unipolar ? info.cores * nPerPhase : nPerPhase;
-  const count = nCables;
-  const areaCables = count * Math.PI * (od / 2) ** 2;
-  const fillLimit = count <= 1 ? 0.53 : count === 2 ? 0.31 : 0.4;
+  const cores = info.unipolar ? "1" : info.cores === 2 ? "2" : info.cores === 4 ? "4" : "3";
+  const family = insulation === "PVC" ? "pvc-pvc" : "eprotenax";
+  const od = odOf(family, cores as "1" | "2" | "3" | "4", section) ?? cableOd(section, formation);
+  if (!od) return { nps: null, fillPct: 0, od: null, conductors: 0 };
+  const conductors = info.unipolar ? info.cores * nPerPhase : nPerPhase;
+  const areaCables = conductors * Math.PI * (od / 2) ** 2;
+  const fillLimit = conductors <= 1 ? 0.53 : conductors === 2 ? 0.31 : 0.4;
   const requiredId = 2 * Math.sqrt(areaCables / fillLimit / Math.PI);
   const c = CONDUITS.find((x) => x.idMm >= requiredId);
   const used = c ? areaCables / (Math.PI * (c.idMm / 2) ** 2) : 1;
-  return { nps: c?.nps ?? null, fillPct: used * 100, od };
+  return { nps: c?.nps ?? null, fillPct: used * 100, od, conductors };
 }
 
 function iscLocalKa(input: CircuitInput, rca: number, xl: number, n: number): number {
@@ -151,6 +169,13 @@ export function calculate(input: CircuitInput): CircuitResult {
   const loaded = loadedConductors(input);
   const buried = METHOD_INFO[input.method].buried;
   const ft = interpolateTemp(input.tempC, input.insulation, buried);
+  const soil = buried ? soilFactor(input.soilRho ?? 2.5) : { fs: 1, source: "—" };
+  const fs = soil.fs;
+  const al = (input.conductor ?? "Cu") === "Al";
+  const kPhase = al ? alK(input.insulation) : K_PHASE[input.insulation];
+  const kPe = al ? alPeK(input.insulation) : K_PE_ISOLATED[input.insulation];
+  const harm = harmonicAdjust(input.harmonic3Pct ?? 0, ib);
+  const fh = harm.fh;
   const grp = groupingFactor(input.method, input.nCircuits, {
     buriedDucts: input.buriedDucts,
     unipolar: FORMATION_INFO[input.formation].unipolar,
@@ -161,17 +186,16 @@ export function calculate(input: CircuitInput): CircuitResult {
   const fa = input.groupingOverride && input.groupingOverride > 0 ? input.groupingOverride : grp.fa;
 
   const isMotor = input.kind === "motor";
-  const invCorr = fa > 0 && ft > 0 ? 1 / (fa * ft) : 1;
+  const invCorr = fa > 0 && ft > 0 && fs > 0 && fh > 0 ? 1 / (fa * ft * fs * fh) : 1;
   const fr = input.reserveEnabled && isMotor && input.loadType !== "kva" && invCorr < 1.25 ? 1.25 : 1;
-  const ip = ib * Math.max(fr, invCorr);
+  const ip = Math.max(ib, harm.sizeByIb) * Math.max(fr, invCorr);
 
   const motorFound =
     isMotor ? findMotor(input.powerKw) ?? (input.powerCv > 0 ? findMotorByCv(input.powerCv) : undefined) : undefined;
   const vKey = motorVoltageKey(input.voltage);
   const motorProt = motorFound && vKey ? motorFound.prot[vKey] : null;
 
-  const minS = MIN_SECTION[input.kind] ?? 2.5;
-  const kPhase = K_PHASE[input.insulation];
+  const minS = al ? minSectionAl(input.kind) : (MIN_SECTION[input.kind] ?? 2.5);
   const sections = SECTIONS.filter((s) => s + 1e-9 >= minS);
 
   type Cand = {
@@ -194,11 +218,17 @@ export function calculate(input: CircuitInput): CircuitResult {
   for (let n = 1; n <= 6; n++) {
     const iPer = ip / n;
     for (const s of sections) {
-      const imax = ampacityOf(input.method, s, input.insulation, loaded);
-      if (imax == null || imax + 1e-9 < iPer) continue;
-      const iz = imax * fa * ft * n;
-      const imp = impedanceOf(input.insulation, s, input.formation);
-      if (!imp) continue;
+      const imax0 = ampacityOf(input.method, s, input.insulation, loaded);
+      if (imax0 == null) continue;
+      const imax = imax0 * (al ? alAmpacityFactor() : 1);
+      if (imax + 1e-9 < iPer) continue;
+      const iz = imax * fa * ft * fs * fh * n;
+      const motorBr = motorProt && motorProt.breaker >= 6 ? motorProt.breaker : undefined;
+      const br = pickBreaker(ib, iz, motorBr);
+      if (!breakerFits(ib, iz, br)) continue;
+      const imp0 = impedanceOf(input.insulation, s, input.formation);
+      if (!imp0) continue;
+      const imp = al ? { rca: imp0.rca * 1.64, xl: imp0.xl } : imp0;
       const drop = voltageDropPct(input, ib, imp.rca, imp.xl, n, "nbr");
       const dropMod = voltageDropPct(input, ib, imp.rca, imp.xl, n, "modulus");
       if (drop.dropPct > input.maxDropPct + 1e-6) continue;
@@ -268,15 +298,35 @@ export function calculate(input: CircuitInput): CircuitResult {
       ok: false,
       limiting: "indefinido",
       copperKgPerKm: 0,
+      fh,
+      fs,
+      peIcwKa: 0,
+      inNeutral: harm.inNeutral,
+      iaA: 0,
+      tDiscS: 0,
     };
   }
 
   const iz = best.iz;
   const breaker = pickBreaker(ib, iz, motorProt && motorProt.breaker >= 6 ? motorProt.breaker : undefined);
-  const pe = nearestSection(minPe(best.s));
+  let pe = nearestSection(minPe(best.s));
+  const tS = Math.max(input.iscTimeS, 1e-6);
+  const sPeThermal = best.iscL > 0 ? (best.iscL * 1000 * Math.sqrt(tS)) / kPe : 0;
+  if (sPeThermal > pe) pe = nearestSection(sPeThermal);
+  const peIcwKa = (kPe * pe) / Math.sqrt(tS) / 1000;
   const needsN = input.phases !== 3 || input.formation === "4x1" || input.formation === "1x4";
-  const neutral = needsN ? nearestSection(minNeutral(best.s)) : minNeutral(best.s);
-  const conduit = sizeConduit(best.s, input.formation, best.n);
+  let neutral = needsN ? nearestSection(minNeutral(best.s)) : minNeutral(best.s);
+  if (harm.inNeutral > ib + 1e-6) {
+    const nHarm = nearestSection(best.s * (harm.inNeutral / Math.max(ib, 1e-6)));
+    if (nHarm > (neutral ?? 0)) neutral = nHarm;
+  }
+  const conduit = sizeConduit(best.s, input.formation, best.n, input.insulation);
+
+  const u0 = input.phases === 3 ? input.voltage / SQRT3 : input.voltage;
+  const iaA = magneticIa(breaker);
+  const tDiscS = disconnectTimeS(input.kind, u0);
+  const run = conduitRunLimit(false, input.conduitBends ?? 0);
+  const methodConduit = input.method === "A1" || input.method === "A2" || input.method === "B1" || input.method === "B2";
 
   checks.push({
     id: "ib-in-iz",
@@ -289,14 +339,14 @@ export function calculate(input: CircuitInput): CircuitResult {
     id: "iz-ib",
     label: "Capacidade de condução",
     ok: iz + 1e-6 >= ib,
-    detail: `Iz = ${fmtA(best.imax)} × ${fa.toFixed(2)} × ${ft.toFixed(2)} × ${best.n} = ${fmtA(iz)} ≥ Ib`,
+    detail: `Iz = ${fmtA(best.imax)} × Fa ${fa.toFixed(2)} × Ft ${ft.toFixed(2)} × Fs ${fs.toFixed(2)} × Fh ${fh.toFixed(2)} × ${best.n} = ${fmtA(iz)} ≥ Ib`,
     ref: "NBR 5410 6.2.5 · Tab. 33–36",
   });
   checks.push({
     id: "drop",
-    label: `Queda de tensão ≤ ${input.maxDropPct} %`,
+    label: `Queda de tensão do trecho ≤ ${input.maxDropPct} %`,
     ok: best.drop.dropPct <= input.maxDropPct + 1e-6,
-    detail: `ΔV = ${best.drop.dropPct.toFixed(2)} % (R cosφ + X senφ). |Z| = ${best.dropMod.dropPct.toFixed(2)} % (comparação).`,
+    detail: `ΔV trecho = ${best.drop.dropPct.toFixed(2)} % (R cosφ + X senφ). |Z| = ${best.dropMod.dropPct.toFixed(2)} %.`,
     ref: "NBR 5410 6.2.7",
   });
   checks.push({
@@ -310,7 +360,7 @@ export function calculate(input: CircuitInput): CircuitResult {
     id: "min-s",
     label: "Seção mínima do tipo de circuito",
     ok: best.s + 1e-9 >= minS,
-    detail: `${best.s} mm² ≥ ${minS} mm²`,
+    detail: `${best.s} mm² ≥ ${minS} mm²${al ? " (Al, Tab. 47)" : ""}`,
     ref: "NBR 5410 Tabela 47",
   });
   const i2 = 1.45 * breaker;
@@ -321,15 +371,59 @@ export function calculate(input: CircuitInput): CircuitResult {
     detail: `1,45·In = ${fmtA(i2)} · 1,45·Iz = ${fmtA(1.45 * iz)}`,
     ref: "NBR 5410 5.7.2.2.1.b",
   });
+  checks.push({
+    id: "pe-th",
+    label: "PE — seção térmica (I²t)",
+    ok: input.iscKa <= 0 || peIcwKa + 1e-9 >= best.iscL,
+    detail: `PE ${pe} mm² · Icw PE ${peIcwKa.toFixed(1)} kA (k = ${kPe}) ≥ Icc ${best.iscL.toFixed(2)} kA`,
+    ref: "NBR 5410 5.3.5 · Tab. 58",
+  });
+  checks.push({
+    id: "disc",
+    label: `Desligamento TN ≤ ${tDiscS} s`,
+    ok: input.iscKa <= 0 || best.iscL * 1000 + 1e-6 >= iaA,
+    detail: `Ia magnética ≈ 5·In = ${fmtA(iaA)} · Icc ${fmtA(best.iscL * 1000)} · U0 ${u0.toFixed(0)} V`,
+    ref: "NBR 5410 5.7.3",
+  });
+  if (al) {
+    checks.push({
+      id: "al",
+      label: "Condutor de alumínio",
+      ok: best.s + 1e-9 >= minS,
+      detail: `Imax ≈ 0,78 × tabela Cu · Rca × 1,64 · k ${kPhase} · mín. ${minS} mm². Confrontar com o catálogo.`,
+      ref: "NBR 5410 Tab. 36 / 37 / 47",
+    });
+  }
+  if ((input.harmonic3Pct ?? 0) >= 15) {
+    checks.push({
+      id: "h3",
+      label: "Neutro com 3ª harmônica",
+      ok: true,
+      detail: harm.note + ` · N ${neutral ?? "—"} mm²`,
+      ref: "NBR 5410 6.2.6",
+    });
+  }
   if (conduit.nps) {
     checks.push({
       id: "conduit",
       label: "Ocupação do eletroduto",
       ok: conduit.fillPct <= 41,
-      detail: `${conduit.nps} · ocupação ${conduit.fillPct.toFixed(0)} % (limite 40 % para 3+ condutores)`,
+      detail: `${conduit.nps} · ${conduit.conductors} COND. · ocupação ${conduit.fillPct.toFixed(0)} % (1 COND. 53 % · 2 COND. 31 % · 3+ COND. 40 %)`,
       ref: "NBR 5410 6.2.11",
     });
   }
+  if (methodConduit) {
+    const bends = input.conduitBends ?? 0;
+    checks.push({
+      id: "run",
+      label: "Trecho contínuo de eletroduto",
+      ok: run.okBends,
+      detail: `${input.lengthM} m de circuito · ${bends} curva(s) sem caixa. Limite de trecho contínuo ${run.maxM} m — interpor caixa se exceder.`,
+      ref: "NBR 5410 6.2.11.1.6-b / 6.2.11.1.7",
+    });
+  }
+
+  const density = al ? 2.7 : 8.89;
 
   return {
     ib,
@@ -375,7 +469,13 @@ export function calculate(input: CircuitInput): CircuitResult {
     checks,
     ok: checks.every((c) => c.ok),
     limiting: best.limiting,
-    copperKgPerKm: best.n * best.s * 3 * 8.89 / 1000,
+    copperKgPerKm: (best.n * best.s * 3 * density) / 1000,
+    fh,
+    fs,
+    peIcwKa,
+    inNeutral: harm.inNeutral,
+    iaA,
+    tDiscS,
   };
 }
 

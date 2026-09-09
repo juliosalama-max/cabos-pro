@@ -10,20 +10,31 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as LoginRouteImport } from './routes/login'
+import { Route as EletrocalhaRouteImport } from './routes/eletrocalha'
+import { Route as EletrodutoRouteImport } from './routes/eletroduto'
+import { Route as EnvelopeRouteImport } from './routes/envelope'
 import { Route as MemoriaRouteImport } from './routes/memoria'
 import { Route as NormaRouteImport } from './routes/norma'
 import { Route as TabelasRouteImport } from './routes/tabelas'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const EletrocalhaRoute = EletrocalhaRouteImport.update({
+  id: '/eletrocalha',
+  path: '/eletrocalha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EletrodutoRoute = EletrodutoRouteImport.update({
+  id: '/eletroduto',
+  path: '/eletroduto',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EnvelopeRoute = EnvelopeRouteImport.update({
+  id: '/envelope',
+  path: '/envelope',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MemoriaRoute = MemoriaRouteImport.update({
@@ -41,59 +52,73 @@ const TabelasRoute = TabelasRouteImport.update({
   path: '/tabelas',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/login': typeof LoginRoute
+  '/eletrocalha': typeof EletrocalhaRoute
+  '/eletroduto': typeof EletrodutoRoute
+  '/envelope': typeof EnvelopeRoute
   '/memoria': typeof MemoriaRoute
   '/norma': typeof NormaRoute
   '/tabelas': typeof TabelasRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/login': typeof LoginRoute
+  '/eletrocalha': typeof EletrocalhaRoute
+  '/eletroduto': typeof EletrodutoRoute
+  '/envelope': typeof EnvelopeRoute
   '/memoria': typeof MemoriaRoute
   '/norma': typeof NormaRoute
   '/tabelas': typeof TabelasRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/login': typeof LoginRoute
+  '/eletrocalha': typeof EletrocalhaRoute
+  '/eletroduto': typeof EletrodutoRoute
+  '/envelope': typeof EnvelopeRoute
   '/memoria': typeof MemoriaRoute
   '/norma': typeof NormaRoute
   '/tabelas': typeof TabelasRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/memoria' | '/norma' | '/tabelas' | '/api/auth/$'
-  fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/memoria' | '/norma' | '/tabelas' | '/api/auth/$'
-  id:
-    | '__root__'
+  fullPaths:
     | '/'
-    | '/login'
+    | '/eletrocalha'
+    | '/eletroduto'
+    | '/envelope'
     | '/memoria'
     | '/norma'
     | '/tabelas'
-    | '/api/auth/$'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/'
+    | '/eletrocalha'
+    | '/eletroduto'
+    | '/envelope'
+    | '/memoria'
+    | '/norma'
+    | '/tabelas'
+  id:
+    | '__root__'
+    | '/'
+    | '/eletrocalha'
+    | '/eletroduto'
+    | '/envelope'
+    | '/memoria'
+    | '/norma'
+    | '/tabelas'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  LoginRoute: typeof LoginRoute
+  EletrocalhaRoute: typeof EletrocalhaRoute
+  EletrodutoRoute: typeof EletrodutoRoute
+  EnvelopeRoute: typeof EnvelopeRoute
   MemoriaRoute: typeof MemoriaRoute
   NormaRoute: typeof NormaRoute
   TabelasRoute: typeof TabelasRoute
-  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -105,11 +130,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/eletrocalha': {
+      id: '/eletrocalha'
+      path: '/eletrocalha'
+      fullPath: '/eletrocalha'
+      preLoaderRoute: typeof EletrocalhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/eletroduto': {
+      id: '/eletroduto'
+      path: '/eletroduto'
+      fullPath: '/eletroduto'
+      preLoaderRoute: typeof EletrodutoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/envelope': {
+      id: '/envelope'
+      path: '/envelope'
+      fullPath: '/envelope'
+      preLoaderRoute: typeof EnvelopeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/memoria': {
@@ -133,23 +172,17 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TabelasRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  LoginRoute: LoginRoute,
+  EletrocalhaRoute: EletrocalhaRoute,
+  EletrodutoRoute: EletrodutoRoute,
+  EnvelopeRoute: EnvelopeRoute,
   MemoriaRoute: MemoriaRoute,
   NormaRoute: NormaRoute,
   TabelasRoute: TabelasRoute,
-  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

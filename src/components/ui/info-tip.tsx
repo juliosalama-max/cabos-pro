@@ -1,33 +1,66 @@
-import * as Popover from "@radix-ui/react-popover";
 import { CircleHelp } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
-export function InfoTip({ text, className }: { text: string; className?: string }) {
+export function InfoTip({
+  text,
+  className,
+  side = "top",
+}: {
+  text: string;
+  className?: string;
+  side?: "top" | "right" | "bottom" | "left";
+}) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!open || !btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    const gap = 8;
+    if (side === "right") setPos({ top: r.top, left: r.right + gap });
+    else if (side === "left") setPos({ top: r.top, left: Math.max(8, r.left - 288 - gap) });
+    else if (side === "bottom") setPos({ top: r.bottom + gap, left: r.left });
+    else setPos({ top: Math.max(8, r.top - gap), left: r.left });
+  }, [open, side]);
+
   return (
-    <Popover.Root>
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "relative grid size-7 shrink-0 place-items-center rounded-full text-muted hover:bg-brand-soft hover:text-brand after:absolute after:top-1/2 after:left-1/2 after:size-9 after:-translate-x-1/2 after:-translate-y-1/2",
-            className,
-          )}
-          aria-label="Ajuda"
-        >
-          <CircleHelp className="size-4" strokeWidth={1.75} />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          side="bottom"
-          align="start"
-          sideOffset={8}
-          collisionPadding={12}
-          className="z-50 max-w-80 rounded-md border border-border bg-surface p-3 text-help leading-relaxed text-fg whitespace-pre-line shadow-card outline-none"
-        >
-          {text}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        aria-label="Ajuda"
+        className={cn(
+          "grid size-7 shrink-0 cursor-help place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-fg",
+          className,
+        )}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+      >
+        <CircleHelp className="size-3.5" strokeWidth={1.75} />
+      </button>
+      {open
+        ? createPortal(
+            <div
+              role="tooltip"
+              style={{
+                position: "fixed",
+                top: pos.top,
+                left: pos.left,
+                transform: side === "top" ? "translateY(-100%)" : undefined,
+                zIndex: 80,
+              }}
+              className="max-w-72 rounded-md bg-ink px-3 py-2 text-xs leading-relaxed text-paper shadow-card"
+            >
+              {text}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }

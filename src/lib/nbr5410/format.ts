@@ -8,8 +8,16 @@ export function fmtA(n: number): string {
   return `${fmt(n, n >= 100 ? 1 : 2)} A`;
 }
 
-export function cableSpec(n: number, formation: string, section: number, insulation: string): string {
+export function cableSpec(
+  n: number,
+  formation: string,
+  section: number,
+  insulation: string,
+  metal: string = "Cu",
+): string {
   if (!section) return "—";
   const form = n > 1 ? `${n}×(${formation} ${section} mm²)` : `${formation} ${section} mm²`;
-  return `${form} ${insulation} Cu`;
+  const ins = insulation === "PVC" ? "PVC/PVC" : insulation;
+  return `${form} ${ins} ${metal === "Al" ? "Al" : "Cu"}`;
 }
+

@@ -27,11 +27,15 @@ function Home() {
   }
 
   return (
-    <AppShell aside={<ResultsPanel input={active} />} strip={<VerdictStrip input={active} />}>
+    <AppShell
+      aside={<ResultsPanel input={active} circuits={project.circuits} origin={project.meta.origin} />}
+      strip={<VerdictStrip input={active} circuits={project.circuits} origin={project.meta.origin} />}
+    >
       <div className="flex flex-col gap-5">
         <div>
-          <p className="text-label font-medium uppercase tracking-[0.12em] text-muted">Circuito</p>
-          <h1 className="font-serif text-2xl font-semibold tracking-tight">{project.meta.name}</h1>
+          <p className="text-sm text-muted">
+            {project.meta.name} · {active.tag}
+          </p>
         </div>
         <ProjectHeader meta={project.meta} onChange={setMeta} />
         <CircuitList
@@ -42,7 +46,7 @@ function Home() {
           onDuplicate={duplicateCircuit}
           onRemove={removeCircuit}
         />
-        <CircuitForm value={active} onChange={setCircuit} />
+        <CircuitForm value={active} circuits={project.circuits} onChange={setCircuit} />
       </div>
     </AppShell>
   );

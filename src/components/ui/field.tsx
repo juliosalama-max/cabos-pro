@@ -28,7 +28,7 @@ export function Field({
 }
 
 const control =
-  "h-11 w-full rounded-sm border border-border bg-paper px-3 text-sm text-fg placeholder:text-subtle disabled:opacity-60";
+  "h-11 w-full rounded-md border border-border bg-surface px-3 text-sm text-fg placeholder:text-subtle disabled:opacity-60";
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(control, props.className)} />;

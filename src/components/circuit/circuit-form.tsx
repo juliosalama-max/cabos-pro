@@ -1,10 +1,22 @@
 import { MOTORS, METHOD_INFO, FORMATION_INFO, METHODS, FORMATIONS, findMotor, findMotorByCv } from "@/lib/nbr5410/tables";
 import { consultPowerKw } from "@/lib/nbr5410/calculate";
 import { fmt } from "@/lib/nbr5410/format";
-import type { CircuitInput, CircuitKind, ConductorMetal, Formation, InstallMethod, Insulation, LoadType, Phases } from "@/lib/nbr5410/types";
+import type {
+  BreakerCurve,
+  CircuitInput,
+  CircuitKind,
+  ConductorMetal,
+  Formation,
+  IdrType,
+  InstallMethod,
+  Insulation,
+  LoadType,
+  Phases,
+  StartMethod,
+} from "@/lib/nbr5410/types";
 import { Card } from "@/components/ui/card";
 import { Field, Input, Readout, Select, Textarea } from "@/components/ui/field";
-import { lightingDemandW, tugDemandVa } from "@/lib/nbr5410/extras";
+import { ICU_KA, lightingDemandW, START_LABEL, tugDemandVa } from "@/lib/nbr5410/extras";
 
 const KINDS: CircuitKind[] = ["alimentador", "motor", "iluminacao", "tug", "tue", "comando"];
 const KIND_L: Record<CircuitKind, string> = {
@@ -56,6 +68,13 @@ const INFO = {
   reserve:
     "Em motores, se 1/(Fa·Ft) for menor que 1,25, aplica-se 1,25 como na planilha original (margem de partida). Pode desligar e usar só Fa e Ft.",
   notes: "Observações livres. Aparecem na memória de cálculo. Não entram em fórmula.",
+  start: "Tipo de partida. Define Ist/Ib: direta 7,5 · Y-Δ 2,5 · soft-starter 3 · inversor 1,2. A seção cresce se ΔV na partida passar do teto.",
+  startDrop: "Teto de queda nos bornes na partida. Prática usual 10 % (NBR 5410 6.2.7 trata do regime; o teto de partida é critério de projeto).",
+  curve: "Curva IEC 60898. Ia (limite superior): B = 5·In, C = 10·In, D = 20·In. Usada no desligamento TN (5.7.3).",
+  icu: "Poder de interrupção do disjuntor na origem do trecho. Deve ser ≥ Icc informado. 0 = menor comercial que atende.",
+  idr: "Dispositivo DR. 30 mA para proteção de pessoas (áreas molhadas, TUG). 300 mA para proteção contra incêndio. Esquema TT exige IDR.",
+  idrType: "Tipo AC só senoidal. Tipo A para cargas eletrônicas. Tipo F/B com inversor ou 3ª harmônica elevada.",
+  fd: "Fator de demanda no quadro de cargas. 0 = automático (1,00; em motores do mesmo pai, o maior 1,00 e os demais 0,75).",
 };
 
 export function CircuitForm({
@@ -130,8 +149,55 @@ export function CircuitForm({
               ))}
             </Select>
           </Field>
+          <Field label="Fator de demanda" info={INFO.fd}>
+            <Select
+              value={String(value.demandFactor ?? 0)}
+              onChange={(e) => set("demandFactor", Number(e.target.value))}
+            >
+              <option value="0">Automático</option>
+              <option value="1">1,00</option>
+              <option value="0.9">0,90</option>
+              <option value="0.8">0,80</option>
+              <option value="0.75">0,75</option>
+              <option value="0.6">0,60</option>
+              <option value="0.5">0,50</option>
+              <option value="0.4">0,40</option>
+            </Select>
+          </Field>
         </div>
       </Card>
+
+      {value.kind === "motor" ? (
+        <Card
+          title="Partida do motor"
+          context="A seção também atende ΔV nos bornes durante Ist. Direta usa 7,5·Ib e cosφ 0,35."
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Tipo de partida" info={INFO.start}>
+              <Select
+                value={value.startMethod ?? "dol"}
+                onChange={(e) => set("startMethod", e.target.value as StartMethod)}
+              >
+                {(Object.keys(START_LABEL) as StartMethod[]).map((k) => (
+                  <option key={k} value={k}>
+                    {START_LABEL[k]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="ΔV máx. partida (%)" info={INFO.startDrop}>
+              <Select
+                value={String(value.maxStartDropPct || 10)}
+                onChange={(e) => set("maxStartDropPct", Number(e.target.value))}
+              >
+                <option value="7">7 %</option>
+                <option value="10">10 % (usual)</option>
+                <option value="15">15 %</option>
+              </Select>
+            </Field>
+          </div>
+        </Card>
+      ) : null}
 
       <Card title="Carga" context="Potência, tensão e comprimento. Definem a corrente de projeto Ib e a queda de tensão.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -308,7 +374,14 @@ export function CircuitForm({
                     type="number"
                     min="0"
                     value={value.tugPoints || ""}
-                    onChange={(e) => set("tugPoints", Number(e.target.value))}
+                    onChange={(e) => {
+                      const tugPoints = Number(e.target.value);
+                      onChange({
+                        tugPoints,
+                        loadType: "kva",
+                        powerKva: tugDemandVa(tugPoints, value.tugWetPoints ?? 0) / 1000,
+                      });
+                    }}
                   />
                 </Field>
                 <Field label="Pontos 600 VA" info={INFO.tugN}>
@@ -317,24 +390,19 @@ export function CircuitForm({
                     min="0"
                     max="3"
                     value={value.tugWetPoints || ""}
-                    onChange={(e) => set("tugWetPoints", Number(e.target.value))}
+                    onChange={(e) => {
+                      const tugWetPoints = Number(e.target.value);
+                      onChange({
+                        tugWetPoints,
+                        loadType: "kva",
+                        powerKva: tugDemandVa(value.tugPoints, tugWetPoints) / 1000,
+                      });
+                    }}
                   />
                 </Field>
                 {value.tugPoints > 0 ? (
                   <p className="text-help text-muted sm:col-span-2">
-                    Demanda {tugDemandVa(value.tugPoints, value.tugWetPoints ?? 0)} VA ·{" "}
-                    <button
-                      type="button"
-                      className="underline"
-                      onClick={() =>
-                        onChange({
-                          loadType: "kva",
-                          powerKva: tugDemandVa(value.tugPoints, value.tugWetPoints ?? 0) / 1000,
-                        })
-                      }
-                    >
-                      usar como kVA
-                    </button>
+                    Demanda {tugDemandVa(value.tugPoints, value.tugWetPoints ?? 0)} VA aplicada como kVA.
                   </p>
                 ) : null}
               </>
@@ -345,20 +413,18 @@ export function CircuitForm({
                     type="number"
                     min="0"
                     value={value.areaM2 || ""}
-                    onChange={(e) => set("areaM2", Number(e.target.value))}
+                    onChange={(e) => {
+                      const areaM2 = Number(e.target.value);
+                      onChange({
+                        areaM2,
+                        loadType: "kw",
+                        powerKw: lightingDemandW(areaM2) / 1000,
+                      });
+                    }}
                   />
                 </Field>
                 {value.areaM2 > 0 ? (
-                  <p className="text-help text-muted">
-                    15 W/m² → {lightingDemandW(value.areaM2) / 1000} kW ·{" "}
-                    <button
-                      type="button"
-                      className="underline"
-                      onClick={() => onChange({ loadType: "kw", powerKw: lightingDemandW(value.areaM2) / 1000 })}
-                    >
-                      usar como kW
-                    </button>
-                  </p>
+                  <p className="text-help text-muted">15 W/m² → {lightingDemandW(value.areaM2) / 1000} kW aplicado.</p>
                 ) : null}
               </>
             )}
@@ -540,6 +606,53 @@ export function CircuitForm({
               <option value="0">Somente Fa e Ft</option>
             </Select>
           </Field>
+          <Field label="Curva do disjuntor" info={INFO.curve}>
+            <Select
+              value={value.breakerCurve ?? (value.kind === "motor" ? "D" : "C")}
+              onChange={(e) => set("breakerCurve", e.target.value as BreakerCurve)}
+            >
+              <option value="B">B · Ia = 5·In</option>
+              <option value="C">C · Ia = 10·In</option>
+              <option value="D">D · Ia = 20·In</option>
+            </Select>
+          </Field>
+          <Field label="Icu (kA)" info={INFO.icu}>
+            <Select value={String(value.icuKa ?? 0)} onChange={(e) => set("icuKa", Number(e.target.value))}>
+              <option value="0">Automático (menor ≥ Icc)</option>
+              {ICU_KA.map((k) => (
+                <option key={k} value={k}>
+                  {String(k).replace(".", ",")} kA
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="IDR IΔn" info={INFO.idr}>
+            <Select
+              value={String(value.idrMa ?? 0)}
+              onChange={(e) => {
+                const idrMa = Number(e.target.value);
+                onChange({
+                  idrMa,
+                  idrType: idrMa === 0 ? "none" : value.idrType === "none" || !value.idrType ? "A" : value.idrType,
+                });
+              }}
+            >
+              <option value="0">Sem IDR</option>
+              <option value="30">30 mA (pessoas)</option>
+              <option value="100">100 mA</option>
+              <option value="300">300 mA (incêndio)</option>
+            </Select>
+          </Field>
+          {(value.idrMa ?? 0) > 0 ? (
+            <Field label="Tipo do IDR" info={INFO.idrType}>
+              <Select value={value.idrType ?? "A"} onChange={(e) => set("idrType", e.target.value as IdrType)}>
+                <option value="AC">AC</option>
+                <option value="A">A</option>
+                <option value="F">F</option>
+                <option value="B">B</option>
+              </Select>
+            </Field>
+          ) : null}
         </div>
         <p className="mt-3 text-help text-muted">
           Queda de tensão pela NBR 5410: ΔV = k · Ib · L · (R cosφ + X senφ). O valor |Z| aparece no veredito só como

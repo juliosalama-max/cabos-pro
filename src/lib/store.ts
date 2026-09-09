@@ -22,6 +22,7 @@ const defaultMeta = (): ProjectMeta => ({
   notes: "Projeto inicial com o circuito da planilha de dimensionamento.",
   updatedAt: new Date().toISOString(),
   origin: "concessionaria",
+  earthing: "TN-S",
 });
 
 function demoProject(): Project {
@@ -72,6 +73,7 @@ function demoProject(): Project {
     dropMethod: "nbr",
     iscKa: 25,
     iscTimeS: 0.1,
+    breakerCurve: "D",
   });
   return {
     id: newId(),
@@ -97,13 +99,26 @@ function hydrateCircuit(c: CircuitInput): CircuitInput {
     tugWetPoints: c.tugWetPoints ?? 0,
     areaM2: c.areaM2 ?? 0,
     groupingOverride: c.groupingOverride ?? null,
+    startMethod: c.startMethod ?? "dol",
+    startRatio: c.startRatio ?? 0,
+    startPf: c.startPf ?? 0,
+    maxStartDropPct: c.maxStartDropPct ?? 10,
+    breakerCurve: c.breakerCurve ?? (c.kind === "motor" ? "D" : "C"),
+    icuKa: c.icuKa ?? 0,
+    idrMa: c.idrMa ?? 0,
+    idrType: c.idrType ?? "none",
+    demandFactor: c.demandFactor ?? 0,
   };
 }
 
 function hydrate(p: Project): Project {
   return {
     ...p,
-    meta: { ...p.meta, origin: p.meta.origin ?? "concessionaria" },
+    meta: {
+      ...p.meta,
+      origin: p.meta.origin ?? "concessionaria",
+      earthing: p.meta.earthing ?? "TN-S",
+    },
     circuits: (p.circuits ?? []).map(hydrateCircuit),
     occupy: p.occupy?.rows?.length ? { ...defaultOccupy(), ...p.occupy } : defaultOccupy(),
     envelope: p.envelope?.grid?.length ? p.envelope : defaultEnvelope(),
@@ -317,7 +332,12 @@ export const useApp = create<AppState>()(
             if (!data.meta || !Array.isArray(data.circuits) || data.circuits.length === 0) return false;
             const p: Project = {
               id: newId(),
-              meta: { ...data.meta, updatedAt: new Date().toISOString(), origin: data.meta.origin ?? "concessionaria" },
+              meta: {
+                ...data.meta,
+                updatedAt: new Date().toISOString(),
+                origin: data.meta.origin ?? "concessionaria",
+                earthing: data.meta.earthing ?? "TN-S",
+              },
               circuits: data.circuits.map(hydrateCircuit),
               activeId: data.circuits[0].id,
               occupy: defaultOccupy(),

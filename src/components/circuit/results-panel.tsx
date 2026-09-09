@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { calculate } from "@/lib/nbr5410/calculate";
 import { dropChain } from "@/lib/nbr5410/project-calc";
 import { cableSpec, fmt, fmtA } from "@/lib/nbr5410/format";
-import type { CircuitInput, OriginKind } from "@/lib/nbr5410/types";
+import type { CircuitInput, EarthingScheme, OriginKind } from "@/lib/nbr5410/types";
 import { cn } from "@/lib/utils";
 
 function Row({ label, value, hint, alert }: { label: string; value: string; hint?: string; alert?: boolean }) {
@@ -23,12 +23,15 @@ function VerdictBody({
   input,
   circuits,
   origin,
+  earthing,
 }: {
   input: CircuitInput;
   circuits?: CircuitInput[];
   origin?: OriginKind;
+  earthing?: EarthingScheme;
 }) {
-  const r = calculate(input);
+  const parent = circuits?.find((c) => c.id === input.parentId);
+  const r = calculate(input, { earthing, parent });
   const chain = circuits?.length ? dropChain(circuits, input.id, origin ?? "concessionaria") : null;
 
   return (
@@ -51,13 +54,21 @@ function VerdictBody({
         <Row label="Ib" value={fmtA(r.ib)} hint="corrente de projeto" />
         <Row label="I′p" value={fmtA(r.ip)} hint="Ib / (Fa·Ft)" />
         <Row label="Iz" value={fmtA(r.iz)} hint={`Imax ${fmtA(r.imax)}`} />
-        <Row label="Disjuntor" value={r.breaker ? `${r.breaker} A` : "—"} hint="In ≥ 1,05 Ib" />
+        <Row label="Disjuntor" value={r.breaker ? `${r.breaker} A` : "—"} hint={`curva ${r.breakerCurve} · Icu ${r.icuKa || "—"} kA`} />
         <Row
           label="ΔV NBR"
           value={`${fmt(r.dropPct, 2)} %`}
           hint={`máx. ${fmt(input.maxDropPct, 0)} %`}
           alert={r.dropPct > input.maxDropPct}
         />
+        {r.istA > 0 ? (
+          <Row
+            label="ΔV partida"
+            value={`${fmt(r.dropStartPct, 2)} %`}
+            hint={`Ist ${fmtA(r.istA)} · ${r.startRatio.toFixed(1)}·Ib`}
+            alert={r.dropStartPct > (input.maxStartDropPct || 10)}
+          />
+        ) : null}
         {chain ? (
           <Row
             label="ΔV acumulada"
@@ -105,9 +116,10 @@ function VerdictBody({
           <Row label="XL" value={`${fmt(r.xl, 3)} Ω/km`} />
           <Row label="V/A·km" value={fmt(r.vakm, 3)} />
           <Row label="Icc no ponto" value={`${fmt(r.iscLocalKa, 2)} kA`} />
+          <Row label="Icu disjuntor" value={`${fmt(r.icuKa, 1)} kA`} />
           <Row label="Icw cabo" value={`${fmt(r.icwKa, 1)} kA`} hint={`k = ${r.kPhase}`} />
           <Row label="Icw PE" value={`${fmt(r.peIcwKa, 1)} kA`} />
-          <Row label="Ia (5·In)" value={fmtA(r.iaA)} hint={`t ≤ ${r.tDiscS} s`} />
+          <Row label={`Ia (${r.breakerCurve})`} value={fmtA(r.iaA)} hint={`t ≤ ${r.tDiscS} s`} />
         </dl>
         {r.motor ? (
           <p className="mt-3 text-help text-muted">
@@ -123,24 +135,29 @@ export function ResultsPanel({
   input,
   circuits,
   origin,
+  earthing,
 }: {
   input: CircuitInput;
   circuits?: CircuitInput[];
   origin?: OriginKind;
+  earthing?: EarthingScheme;
 }) {
-  return <VerdictBody input={input} circuits={circuits} origin={origin} />;
+  return <VerdictBody input={input} circuits={circuits} origin={origin} earthing={earthing} />;
 }
 
 export function VerdictStrip({
   input,
   circuits,
   origin,
+  earthing,
 }: {
   input: CircuitInput;
   circuits?: CircuitInput[];
   origin?: OriginKind;
+  earthing?: EarthingScheme;
 }) {
-  const r = calculate(input);
+  const parent = circuits?.find((c) => c.id === input.parentId);
+  const r = calculate(input, { earthing, parent });
   const [open, setOpen] = useState(false);
 
   return (
@@ -173,7 +190,7 @@ export function VerdictStrip({
             onClick={() => setOpen(false)}
           />
           <div className="absolute inset-x-0 top-full z-40 mt-2 max-h-[70vh] overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-card">
-            <VerdictBody input={input} circuits={circuits} origin={origin} />
+            <VerdictBody input={input} circuits={circuits} origin={origin} earthing={earthing} />
           </div>
         </>
       ) : null}

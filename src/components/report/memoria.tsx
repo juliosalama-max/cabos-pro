@@ -3,7 +3,8 @@ import { Check, Copy, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { calculate } from "@/lib/nbr5410/calculate";
 import { cableSpec, fmt, fmtA } from "@/lib/nbr5410/format";
-import { bom, dropChain } from "@/lib/nbr5410/project-calc";
+import { bom, dropChain, loadBoard } from "@/lib/nbr5410/project-calc";
+import { EARTHING_LABEL } from "@/lib/nbr5410/extras";
 import { KIND_LABEL, type Project } from "@/lib/nbr5410/types";
 import { METHOD_INFO } from "@/lib/nbr5410/tables";
 import { useApp } from "@/lib/store";
@@ -18,8 +19,12 @@ function spec(c: Project["circuits"][number], r: ReturnType<typeof calculate>): 
 }
 
 function buildMemoriaText(project: Project): string {
-  const results = project.circuits.map((c) => ({ c, r: calculate(c) }));
+  const results = project.circuits.map((c) => ({
+    c,
+    r: calculate(c, { earthing: project.meta.earthing, parent: project.circuits.find((p) => p.id === c.parentId) }),
+  }));
   const materials = bom(project);
+  const board = loadBoard(project);
   const lines: string[] = [
     "CABOS Pro — MEMÓRIA DE CÁLCULO",
     "Dimensionamento de condutores · ABNT NBR 5410:2004",
@@ -31,6 +36,7 @@ function buildMemoriaText(project: Project): string {
     `Responsável: ${project.meta.responsible || "—"}`,
     `CREA: ${project.meta.crea || "—"}`,
     `Origem: ${originLabel(project.meta.origin)}`,
+    `Aterramento: ${EARTHING_LABEL[project.meta.earthing ?? "TN-S"]}`,
   ];
   if (project.meta.notes) lines.push(`Observações: ${project.meta.notes}`);
   lines.push("", "RESUMO");
@@ -39,6 +45,15 @@ function buildMemoriaText(project: Project): string {
     lines.push(
       `${c.tag}  ${c.from} → ${c.to}  Ib ${fmtA(r.ib)}  ${spec(c, r)}  In ${r.breaker} A  ΔV ${fmt(r.dropPct, 2)} %  acum. ${fmt(chain.totalPct, 2)} %  ${r.ok && chain.ok ? "OK" : "REVISAR"}`,
     );
+  }
+  lines.push("", "QUADRO DE CARGAS");
+  for (const g of board.groups) {
+    lines.push(
+      `${g.title}  Σ Ib ${fmtA(g.sumIb)}  Σ Id ${fmtA(g.sumId)}${g.parentIz != null ? `  Iz montante ${fmtA(g.parentIz)}` : ""}  ${g.ok ? "OK" : "REVISAR"}`,
+    );
+    for (const row of g.rows) {
+      lines.push(`  ${row.tag}  Ib ${fmtA(row.ib)}  Fd ${fmt(row.fd, 2)}  Id ${fmtA(row.idA)}  In ${row.breaker} A`);
+    }
   }
   lines.push("", "LISTA DE MATERIAIS");
   for (const row of materials) {
@@ -52,10 +67,10 @@ function buildMemoriaText(project: Project): string {
       `${c.from} → ${c.to} · ${c.voltage} V · ${c.phases}φ · ${c.lengthM} m · ${METHOD_INFO[c.method].name} · ${c.conductor ?? "Cu"}`,
       `Ib ${fmtA(r.ib)} · I′p ${fmtA(r.ip)} · Fa ${fmt(r.fa, 2)} · Ft ${fmt(r.ft, 2)} · Fs ${fmt(r.fs, 2)} · Fh ${fmt(r.fh, 2)} · Fr ${fmt(r.fr, 2)}`,
       spec(c, r),
-      `Iz ${fmtA(r.iz)} · In ${r.breaker} A · PE ${r.pe} mm² · Icw PE ${fmt(r.peIcwKa, 1)} kA · Ia ${fmtA(r.iaA)}`,
+      `Iz ${fmtA(r.iz)} · In ${r.breaker} A curva ${r.breakerCurve} · PE ${r.pe} mm² · Icw PE ${fmt(r.peIcwKa, 1)} kA · Ia ${fmtA(r.iaA)}`,
       `Rca ${fmt(r.rca, 3)} Ω/km · XL ${fmt(r.xl, 3)} Ω/km`,
       `ΔV trecho ${fmt(r.dropPct, 2)} % · ΔV acum. ${fmt(chain.totalPct, 2)} % (teto ${fmt(chain.limit, 0)} %) · |Z| ${fmt(r.dropModulusPct, 2)} %`,
-      `Icc ${fmt(r.iscLocalKa, 2)} kA · Icw ${fmt(r.icwKa, 1)} kA · eletroduto ${r.conduit ?? "—"}`,
+      `Icc ${fmt(r.iscLocalKa, 2)} kA · Icu ${fmt(r.icuKa, 1)} kA · Icw ${fmt(r.icwKa, 1)} kA · eletroduto ${r.conduit ?? "—"}`,
     );
     for (const chk of r.checks) {
       lines.push(`${chk.ok ? "OK" : "X"} — ${chk.label}: ${chk.detail} (${chk.ref})`);
@@ -75,8 +90,12 @@ function esc(s: string) {
 }
 
 function buildMemoriaHtml(project: Project): string {
-  const results = project.circuits.map((c) => ({ c, r: calculate(c) }));
+  const results = project.circuits.map((c) => ({
+    c,
+    r: calculate(c, { earthing: project.meta.earthing, parent: project.circuits.find((p) => p.id === c.parentId) }),
+  }));
   const materials = bom(project);
+  const board = loadBoard(project);
   const rows = results
     .map(({ c, r }) => {
       const chain = dropChain(project.circuits, c.id, project.meta.origin);
@@ -106,7 +125,7 @@ function buildMemoriaHtml(project: Project): string {
       return `<h2>${esc(c.tag)} · ${esc(KIND_LABEL[c.kind])}</h2>
         <p>${esc(c.from)} → ${esc(c.to)} · ${c.voltage} V · ${c.phases}φ · ${c.lengthM} m · ${esc(METHOD_INFO[c.method].name)} · ${esc(c.conductor ?? "Cu")}</p>
         <p>Ib ${esc(fmtA(r.ib))} · I′p ${esc(fmtA(r.ip))} · Fa ${esc(fmt(r.fa, 2))} · Ft ${esc(fmt(r.ft, 2))} · Fs ${esc(fmt(r.fs, 2))} · Fh ${esc(fmt(r.fh, 2))} · Fr ${esc(fmt(r.fr, 2))}</p>
-        <p>${esc(spec(c, r))} · Iz ${esc(fmtA(r.iz))} · In ${r.breaker} A · PE ${r.pe} mm² · Icw PE ${esc(fmt(r.peIcwKa, 1))} kA</p>
+        <p>${esc(spec(c, r))} · Iz ${esc(fmtA(r.iz))} · In ${r.breaker} A curva ${r.breakerCurve} · Icu ${esc(fmt(r.icuKa, 1))} kA · PE ${r.pe} mm²</p>
         <p>ΔV trecho ${esc(fmt(r.dropPct, 2))} % · ΔV acum. ${esc(fmt(chain.totalPct, 2))} % (teto ${esc(fmt(chain.limit, 0))} %) · |Z| ${esc(fmt(r.dropModulusPct, 2))} %</p>
         <p>Icc ${esc(fmt(r.iscLocalKa, 2))} kA · Icw ${esc(fmt(r.icwKa, 1))} kA · Ia ${esc(fmtA(r.iaA))} · eletroduto ${esc(r.conduit ?? "—")}</p>
         ${checks}
@@ -125,9 +144,22 @@ function buildMemoriaHtml(project: Project): string {
     <p>Dimensionamento de condutores · ABNT NBR 5410:2004</p>
     <p>${esc(AUTHOR.line)}</p>
     <p>Projeto: ${esc(project.meta.name)} · Cliente: ${esc(project.meta.client || "—")} · Local: ${esc(project.meta.location || "—")}</p>
-    <p>Responsável: ${esc(project.meta.responsible || "—")} · CREA: ${esc(project.meta.crea || "—")} · Origem: ${esc(originLabel(project.meta.origin))}</p>
+    <p>Responsável: ${esc(project.meta.responsible || "—")} · CREA: ${esc(project.meta.crea || "—")} · Origem: ${esc(originLabel(project.meta.origin))} · Aterramento: ${esc(EARTHING_LABEL[project.meta.earthing ?? "TN-S"])}</p>
     ${project.meta.notes ? `<p>Observações: ${esc(project.meta.notes)}</p>` : ""}
     <table><thead><tr><th>Circ.</th><th>Trecho</th><th>Ib</th><th>Cabo</th><th>In</th><th>ΔV</th><th>ΔV acum.</th><th>Icc</th><th>Ø</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+    <h2>Quadro de cargas</h2>
+    ${board.groups
+      .map(
+        (g) =>
+          `<p><b>${esc(g.title)}</b> · Σ Ib ${esc(fmtA(g.sumIb))} · Σ Id ${esc(fmtA(g.sumId))}${g.parentIz != null ? ` · Iz montante ${esc(fmtA(g.parentIz))}` : ""} · ${g.ok ? "OK" : "Revisar"}</p>
+           <table><thead><tr><th>Circ.</th><th>Tipo</th><th>Ib</th><th>Fd</th><th>Id</th><th>In</th></tr></thead><tbody>${g.rows
+             .map(
+               (row) =>
+                 `<tr><td>${esc(row.tag)}</td><td>${esc(KIND_LABEL[row.kind])}</td><td>${esc(fmtA(row.ib))}</td><td>${esc(fmt(row.fd, 2))}</td><td>${esc(fmtA(row.idA))}</td><td>${row.breaker} A</td></tr>`,
+             )
+             .join("")}</tbody></table>`,
+      )
+      .join("")}
     <h2>Lista de materiais</h2>
     <table><thead><tr><th>Item</th><th>Quantidade</th><th>Nota</th></tr></thead><tbody>${bomRows}</tbody></table>
     ${details}
@@ -137,8 +169,12 @@ function buildMemoriaHtml(project: Project): string {
 
 export function MemoriaView() {
   const project = useApp((s) => s.project());
-  const results = project.circuits.map((c) => ({ c, r: calculate(c) }));
+  const results = project.circuits.map((c) => ({
+    c,
+    r: calculate(c, { earthing: project.meta.earthing, parent: project.circuits.find((p) => p.id === c.parentId) }),
+  }));
   const materials = bom(project);
+  const board = loadBoard(project);
   const [copied, setCopied] = useState(false);
 
   async function copyMemoria() {
@@ -210,6 +246,10 @@ export function MemoriaView() {
             <dt className="text-muted">Origem da instalação</dt>
             <dd>{originLabel(project.meta.origin)}</dd>
           </div>
+          <div className="md:col-span-2">
+            <dt className="text-muted">Aterramento</dt>
+            <dd>{EARTHING_LABEL[project.meta.earthing ?? "TN-S"]}</dd>
+          </div>
         </dl>
         {project.meta.notes ? <p className="mt-3 text-sm text-muted">{project.meta.notes}</p> : null}
         <p className="mt-4 text-[11px] text-muted">
@@ -258,6 +298,40 @@ export function MemoriaView() {
           </tbody>
         </table>
       </div>
+
+      {board.groups.map((g) => (
+        <div key={g.key} className="overflow-x-auto rounded-lg border border-border bg-surface shadow-card print:shadow-none">
+          <h3 className="px-4 pt-4 font-serif text-lg font-semibold">{g.title}</h3>
+          <p className="px-4 text-help text-muted">
+            Σ Ib {fmtA(g.sumIb)} · Σ Id {fmtA(g.sumId)}
+            {g.parentIz != null ? ` · Iz montante ${fmtA(g.parentIz)}` : ""} · {g.ok ? "OK" : "Revisar"}
+          </p>
+          <table className="mt-2 w-full min-w-[640px] text-xs">
+            <thead className="text-left text-label uppercase tracking-wider text-muted">
+              <tr className="border-y border-border">
+                <th className="px-3 py-2">Circ.</th>
+                <th className="px-3 py-2">Tipo</th>
+                <th className="px-3 py-2">Ib</th>
+                <th className="px-3 py-2">Fd</th>
+                <th className="px-3 py-2">Id</th>
+                <th className="px-3 py-2">In</th>
+              </tr>
+            </thead>
+            <tbody>
+              {g.rows.map((row) => (
+                <tr key={row.id} className="border-b border-border/60">
+                  <td className="px-3 py-2">{row.tag}</td>
+                  <td className="px-3 py-2">{KIND_LABEL[row.kind]}</td>
+                  <td className="px-3 py-2 font-mono">{fmtA(row.ib)}</td>
+                  <td className="px-3 py-2 font-mono">{fmt(row.fd, 2)}</td>
+                  <td className="px-3 py-2 font-mono">{fmtA(row.idA)}</td>
+                  <td className="px-3 py-2 font-mono">{row.breaker} A</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
 
       <div className="overflow-x-auto rounded-lg border border-border bg-surface shadow-card print:shadow-none">
         <h3 className="px-4 pt-4 font-serif text-lg font-semibold">Lista de materiais</h3>

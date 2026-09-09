@@ -15,6 +15,7 @@ import { Route as EletrodutoRouteImport } from './routes/eletroduto'
 import { Route as EnvelopeRouteImport } from './routes/envelope'
 import { Route as MemoriaRouteImport } from './routes/memoria'
 import { Route as NormaRouteImport } from './routes/norma'
+import { Route as QuadroRouteImport } from './routes/quadro'
 import { Route as TabelasRouteImport } from './routes/tabelas'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +48,11 @@ const NormaRoute = NormaRouteImport.update({
   path: '/norma',
   getParentRoute: () => rootRouteImport,
 } as any)
+const QuadroRoute = QuadroRouteImport.update({
+  id: '/quadro',
+  path: '/quadro',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TabelasRoute = TabelasRouteImport.update({
   id: '/tabelas',
   path: '/tabelas',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/envelope': typeof EnvelopeRoute
   '/memoria': typeof MemoriaRoute
   '/norma': typeof NormaRoute
+  '/quadro': typeof QuadroRoute
   '/tabelas': typeof TabelasRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/envelope': typeof EnvelopeRoute
   '/memoria': typeof MemoriaRoute
   '/norma': typeof NormaRoute
+  '/quadro': typeof QuadroRoute
   '/tabelas': typeof TabelasRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/envelope': typeof EnvelopeRoute
   '/memoria': typeof MemoriaRoute
   '/norma': typeof NormaRoute
+  '/quadro': typeof QuadroRoute
   '/tabelas': typeof TabelasRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/envelope'
     | '/memoria'
     | '/norma'
+    | '/quadro'
     | '/tabelas'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/envelope'
     | '/memoria'
     | '/norma'
+    | '/quadro'
     | '/tabelas'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/envelope'
     | '/memoria'
     | '/norma'
+    | '/quadro'
     | '/tabelas'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   EnvelopeRoute: typeof EnvelopeRoute
   MemoriaRoute: typeof MemoriaRoute
   NormaRoute: typeof NormaRoute
+  QuadroRoute: typeof QuadroRoute
   TabelasRoute: typeof TabelasRoute
 }
 
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NormaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/quadro': {
+      id: '/quadro'
+      path: '/quadro'
+      fullPath: '/quadro'
+      preLoaderRoute: typeof QuadroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tabelas': {
       id: '/tabelas'
       path: '/tabelas'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   EnvelopeRoute: EnvelopeRoute,
   MemoriaRoute: MemoriaRoute,
   NormaRoute: NormaRoute,
+  QuadroRoute: QuadroRoute,
   TabelasRoute: TabelasRoute,
 }
 export const routeTree = rootRouteImport

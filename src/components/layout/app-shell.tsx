@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Box, Cable, Columns3, Cylinder, FileSpreadsheet, Folder, Printer, Scale } from "lucide-react";
+import { Box, Cable, ClipboardList, Columns3, Cylinder, FileSpreadsheet, Folder, Printer, Scale } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { AppMark } from "@/components/brand/app-mark";
 import { HubMark } from "@/components/brand/hub-mark";
@@ -33,6 +33,12 @@ const NAV = [
     label: "Envelope",
     icon: Box,
     help: "Dimensões A, B, C e D do envelope de concreto em função do Φ dos dutos. Independente do cálculo elétrico; usa o bitola do eletroduto se você enviar.",
+  },
+  {
+    to: "/quadro",
+    label: "Quadro",
+    icon: ClipboardList,
+    help: "Quadro de cargas: Ib × Fd por circuito e soma no ponto de origem. Confronta a demanda com o Iz do alimentador a montante.",
   },
   {
     to: "/tabelas",

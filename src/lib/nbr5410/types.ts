@@ -10,6 +10,10 @@ export type DropMethod = "nbr" | "modulus";
 export type Phases = 1 | 2 | 3;
 export type ConductorMetal = "Cu" | "Al";
 export type OriginKind = "concessionaria" | "transformador";
+export type StartMethod = "dol" | "yd" | "soft" | "vfd";
+export type BreakerCurve = "B" | "C" | "D";
+export type EarthingScheme = "TN-S" | "TN-C-S" | "TT" | "IT";
+export type IdrType = "none" | "AC" | "A" | "F" | "B";
 
 export interface CircuitInput {
   id: string;
@@ -50,6 +54,20 @@ export interface CircuitInput {
   tugPoints: number;
   tugWetPoints: number;
   areaM2: number;
+  startMethod: StartMethod;
+  startRatio: number;
+  startPf: number;
+  maxStartDropPct: number;
+  breakerCurve: BreakerCurve;
+  icuKa: number;
+  idrMa: number;
+  idrType: IdrType;
+  demandFactor: number;
+}
+
+export interface CalcContext {
+  earthing?: EarthingScheme;
+  parent?: CircuitInput;
 }
 
 export interface Check {
@@ -108,6 +126,11 @@ export interface CircuitResult {
   inNeutral: number;
   iaA: number;
   tDiscS: number;
+  istA: number;
+  dropStartPct: number;
+  startRatio: number;
+  icuKa: number;
+  breakerCurve: BreakerCurve;
 }
 
 export interface ProjectMeta {
@@ -119,6 +142,7 @@ export interface ProjectMeta {
   notes: string;
   updatedAt: string;
   origin: OriginKind;
+  earthing: EarthingScheme;
 }
 
 export interface Project {
@@ -184,6 +208,15 @@ export function defaultCircuit(partial?: Partial<CircuitInput>): CircuitInput {
     tugPoints: 0,
     tugWetPoints: 0,
     areaM2: 0,
+    startMethod: "dol",
+    startRatio: 0,
+    startPf: 0,
+    maxStartDropPct: 10,
+    breakerCurve: "C",
+    icuKa: 0,
+    idrMa: 0,
+    idrType: "none",
+    demandFactor: 0,
     ...partial,
   };
 }
@@ -228,4 +261,13 @@ export const EXAMPLE_FEEDER: CircuitInput = {
   tugPoints: 0,
   tugWetPoints: 0,
   areaM2: 0,
+  startMethod: "dol",
+  startRatio: 0,
+  startPf: 0,
+  maxStartDropPct: 10,
+  breakerCurve: "C",
+  icuKa: 0,
+  idrMa: 0,
+  idrType: "none",
+  demandFactor: 0,
 };

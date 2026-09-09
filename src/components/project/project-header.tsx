@@ -1,6 +1,7 @@
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
-import type { OriginKind, ProjectMeta } from "@/lib/nbr5410/types";
+import { EARTHING_LABEL } from "@/lib/nbr5410/extras";
+import type { EarthingScheme, OriginKind, ProjectMeta } from "@/lib/nbr5410/types";
 
 export function ProjectHeader({
   meta,
@@ -44,6 +45,21 @@ export function ProjectHeader({
           >
             <option value="concessionaria">Concessionária (teto 4 %)</option>
             <option value="transformador">Transformador / gerador (5 % / 7 %)</option>
+          </Select>
+        </Field>
+        <Field
+          label="Esquema de aterramento"
+          info="TN: desligamento pela Ia magnética do disjuntor. TT: exige IDR. IT: 1ª falta não desliga."
+        >
+          <Select
+            value={meta.earthing ?? "TN-S"}
+            onChange={(e) => onChange({ earthing: e.target.value as EarthingScheme })}
+          >
+            {(Object.keys(EARTHING_LABEL) as EarthingScheme[]).map((k) => (
+              <option key={k} value={k}>
+                {EARTHING_LABEL[k]}
+              </option>
+            ))}
           </Select>
         </Field>
         <Field label="CREA" info="Número do CREA do responsável técnico desta obra.">

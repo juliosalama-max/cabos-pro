@@ -21,7 +21,7 @@ import {
 } from "./tables";
 import { SECTIONS } from "./tables-data";
 import { odOf } from "@/lib/install/occupy";
-import type { CircuitInput, CircuitResult, Check } from "./types";
+import type { CalcContext, CircuitInput, CircuitResult, Check } from "./types";
 import {
   alAmpacityFactor,
   alK,
@@ -29,9 +29,16 @@ import {
   conduitRunLimit,
   disconnectTimeS,
   harmonicAdjust,
+  lightingDemandW,
   magneticIa,
+  magneticMult,
   minSectionAl,
+  pickIcu,
   soilFactor,
+  START_DROP_DEFAULT,
+  startPfOf,
+  startRatioOf,
+  tugDemandVa,
 } from "./extras";
 
 const SQRT3 = Math.sqrt(3);
@@ -73,6 +80,17 @@ export function designCurrent(input: CircuitInput): { ib: number; error?: string
 
   if (input.loadType === "ib" && input.ibManual > 0) {
     return { ib: input.ibManual };
+  }
+
+  if (input.kind === "tug" && input.tugPoints > 0 && !(input.powerKva > 0) && !(input.powerKw > 0) && !(input.ibManual > 0)) {
+    const kva = tugDemandVa(input.tugPoints, input.tugWetPoints ?? 0) / 1000;
+    if (input.phases === 3) return { ib: (kva * 1000) / (V * SQRT3) };
+    return { ib: (kva * 1000) / V };
+  }
+  if (input.kind === "iluminacao" && input.areaM2 > 0 && !(input.powerKw > 0) && !(input.powerKva > 0) && !(input.ibManual > 0)) {
+    const pW = lightingDemandW(input.areaM2);
+    if (input.phases === 3) return { ib: pW / (V * SQRT3 * pf * eta) };
+    return { ib: pW / (V * pf * eta) };
   }
 
   if (input.loadType === "kva" && input.powerKva > 0) {
@@ -122,9 +140,10 @@ function voltageDropPct(
   xl: number,
   n: number,
   method: "nbr" | "modulus",
+  pfOverride?: number,
 ): { dropV: number; dropPct: number; zvd: number; vakm: number } {
   const Lkm = input.lengthM / 1000;
-  const pf = Math.min(1, Math.max(0, input.pf));
+  const pf = Math.min(1, Math.max(0, pfOverride ?? input.pf));
   const sf = Math.sqrt(Math.max(0, 1 - pf * pf));
   const zvd = method === "modulus" ? Math.hypot(rca, xl) : rca * pf + xl * sf;
   const k = input.phases === 3 ? SQRT3 : 2;
@@ -164,7 +183,7 @@ function fmtA(n: number): string {
   return `${n.toFixed(n >= 100 ? 1 : 2)} A`;
 }
 
-export function calculate(input: CircuitInput): CircuitResult {
+export function calculate(input: CircuitInput, ctx?: CalcContext): CircuitResult {
   const { ib, error } = designCurrent(input);
   const loaded = loadedConductors(input);
   const buried = METHOD_INFO[input.method].buried;
@@ -198,6 +217,13 @@ export function calculate(input: CircuitInput): CircuitResult {
   const minS = al ? minSectionAl(input.kind) : (MIN_SECTION[input.kind] ?? 2.5);
   const sections = SECTIONS.filter((s) => s + 1e-9 >= minS);
 
+  const startMethod = input.startMethod ?? "dol";
+  const startRatio = isMotor ? startRatioOf(startMethod, input.startRatio) : 1;
+  const startPf = isMotor ? startPfOf(startMethod, input.startPf) : input.pf;
+  const istA = isMotor ? ib * startRatio : 0;
+  const maxStart = input.maxStartDropPct > 0 ? input.maxStartDropPct : START_DROP_DEFAULT;
+  const curve = input.breakerCurve ?? (isMotor ? "D" : "C");
+
   type Cand = {
     n: number;
     s: number;
@@ -207,6 +233,7 @@ export function calculate(input: CircuitInput): CircuitResult {
     xl: number;
     drop: ReturnType<typeof voltageDropPct>;
     dropMod: ReturnType<typeof voltageDropPct>;
+    dropStart: ReturnType<typeof voltageDropPct>;
     icw: number;
     iscL: number;
     limiting: string;
@@ -232,17 +259,37 @@ export function calculate(input: CircuitInput): CircuitResult {
       const drop = voltageDropPct(input, ib, imp.rca, imp.xl, n, "nbr");
       const dropMod = voltageDropPct(input, ib, imp.rca, imp.xl, n, "modulus");
       if (drop.dropPct > input.maxDropPct + 1e-6) continue;
+      const dropStart = isMotor
+        ? voltageDropPct(input, istA, imp.rca, imp.xl, n, "nbr", startPf)
+        : { dropV: 0, dropPct: 0, zvd: 0, vakm: 0 };
+      if (isMotor && dropStart.dropPct > maxStart + 1e-6) continue;
       const icw = (kPhase * s * n) / Math.sqrt(Math.max(input.iscTimeS, 1e-6)) / 1000;
       const iscL = iscLocalKa(input, imp.rca, imp.xl, n);
       if (input.iscKa > 0 && icw + 1e-9 < iscL) continue;
       const copper = n * s;
       const limiting =
-        drop.dropPct > input.maxDropPct * 0.85
-          ? "queda de tensão"
-          : iPer > imax * 0.92
-            ? "capacidade de corrente"
-            : "seção mínima";
-      const cand: Cand = { n, s, imax, iz, rca: imp.rca, xl: imp.xl, drop, dropMod, icw, iscL, limiting, copper };
+        isMotor && dropStart.dropPct > maxStart * 0.85
+          ? "queda na partida"
+          : drop.dropPct > input.maxDropPct * 0.85
+            ? "queda de tensão"
+            : iPer > imax * 0.92
+              ? "capacidade de corrente"
+              : "seção mínima";
+      const cand: Cand = {
+        n,
+        s,
+        imax,
+        iz,
+        rca: imp.rca,
+        xl: imp.xl,
+        drop,
+        dropMod,
+        dropStart,
+        icw,
+        iscL,
+        limiting,
+        copper,
+      };
       best = cand;
       break;
     }
@@ -260,7 +307,7 @@ export function calculate(input: CircuitInput): CircuitResult {
       label: "Dimensionamento",
       ok: false,
       detail:
-        "Nenhuma seção até 6×300 mm² atende corrente, queda e Icc ao mesmo tempo. Afrouxe agrupamento, aumente a queda máxima ou use outro método.",
+        "Nenhuma seção até 6×300 mm² atende corrente, queda de serviço, queda na partida e Icc ao mesmo tempo. Afrouxe agrupamento, aumente a queda máxima, mude a partida ou use outro método.",
       ref: "NBR 5410 6.2",
     });
     return {
@@ -304,6 +351,11 @@ export function calculate(input: CircuitInput): CircuitResult {
       inNeutral: harm.inNeutral,
       iaA: 0,
       tDiscS: 0,
+      istA,
+      dropStartPct: 0,
+      startRatio,
+      icuKa: 0,
+      breakerCurve: curve,
     };
   }
 
@@ -323,10 +375,14 @@ export function calculate(input: CircuitInput): CircuitResult {
   const conduit = sizeConduit(best.s, input.formation, best.n, input.insulation);
 
   const u0 = input.phases === 3 ? input.voltage / SQRT3 : input.voltage;
-  const iaA = magneticIa(breaker);
+  const iaA = magneticIa(breaker, curve);
   const tDiscS = disconnectTimeS(input.kind, u0);
   const run = conduitRunLimit(false, input.conduitBends ?? 0);
   const methodConduit = input.method === "A1" || input.method === "A2" || input.method === "B1" || input.method === "B2";
+  const icu = input.icuKa > 0 ? input.icuKa : pickIcu(input.iscKa);
+  const earthing = ctx?.earthing ?? "TN-S";
+  const idrMa = input.idrMa ?? 0;
+  const idrType = input.idrType ?? "none";
 
   checks.push({
     id: "ib-in-iz",
@@ -378,13 +434,90 @@ export function calculate(input: CircuitInput): CircuitResult {
     detail: `PE ${pe} mm² · Icw PE ${peIcwKa.toFixed(1)} kA (k = ${kPe}) ≥ Icc ${best.iscL.toFixed(2)} kA`,
     ref: "NBR 5410 5.3.5 · Tab. 58",
   });
+  if (isMotor) {
+    checks.push({
+      id: "start",
+      label: `Queda na partida ≤ ${maxStart} %`,
+      ok: best.dropStart.dropPct <= maxStart + 1e-6,
+      detail: `Ist ${fmtA(istA)} (${startRatio.toFixed(1)}·Ib, ${startMethod.toUpperCase()}, cosφ ${startPf.toFixed(2)}) · ΔV partida ${best.dropStart.dropPct.toFixed(2)} %`,
+      ref: "NBR 5410 6.2.7 · prática 10 % nos bornes",
+    });
+  }
   checks.push({
-    id: "disc",
-    label: `Desligamento TN ≤ ${tDiscS} s`,
-    ok: input.iscKa <= 0 || best.iscL * 1000 + 1e-6 >= iaA,
-    detail: `Ia magnética ≈ 5·In = ${fmtA(iaA)} · Icc ${fmtA(best.iscL * 1000)} · U0 ${u0.toFixed(0)} V`,
-    ref: "NBR 5410 5.7.3",
+    id: "icu",
+    label: "Icu do disjuntor ≥ Icc na origem",
+    ok: input.iscKa <= 0 || icu + 1e-9 >= input.iscKa,
+    detail:
+      input.iscKa <= 0
+        ? "Icc de origem não informado"
+        : `Icu ${icu} kA ≥ Icc origem ${input.iscKa} kA${input.icuKa > 0 ? "" : " (menor comercial)"}`,
+    ref: "NBR 5410 5.3.4 / IEC 60947-2",
   });
+  if (earthing === "IT") {
+    checks.push({
+      id: "disc",
+      label: "Esquema IT — 1ª falta",
+      ok: true,
+      detail: "A 1ª falta não exige desligamento automático. IMD ou IDR para a 2ª falta. Confirmar tensão de contato.",
+      ref: "NBR 5410 5.7.3.4",
+    });
+  } else if (earthing === "TT") {
+    checks.push({
+      id: "disc",
+      label: "Desligamento TT (IDR)",
+      ok: idrMa > 0,
+      detail:
+        idrMa > 0
+          ? `IΔn ${idrMa} mA. Confirmar RA ≤ 50 / IΔn no aterramento local.`
+          : "Esquema TT exige IDR para desligamento automático.",
+      ref: "NBR 5410 5.7.3.3",
+    });
+  } else {
+    const mult = magneticMult(curve);
+    checks.push({
+      id: "disc",
+      label: `Desligamento ${earthing} ≤ ${tDiscS} s`,
+      ok: input.iscKa <= 0 || best.iscL * 1000 + 1e-6 >= iaA,
+      detail: `Curva ${curve} · Ia ≈ ${mult}·In = ${fmtA(iaA)} · Icc ${fmtA(best.iscL * 1000)} · U0 ${u0.toFixed(0)} V`,
+      ref: "NBR 5410 5.7.3 / IEC 60898",
+    });
+  }
+  if (idrMa > 0) {
+    const typeOk = !((input.harmonic3Pct ?? 0) >= 15 && idrType === "AC");
+    checks.push({
+      id: "idr",
+      label: `IDR ${idrMa} mA tipo ${idrType}`,
+      ok: typeOk,
+      detail: typeOk
+        ? `IΔn ${idrMa} mA · tipo ${idrType}. Coordenar com o In ${breaker} A.`
+        : "Tipo AC não convém com 3ª harmônica ≥ 15 % — usar tipo A, F ou B.",
+      ref: "NBR 5410 5.1.3.1 / IEC 61008",
+    });
+  } else if ((input.tugWetPoints ?? 0) > 0) {
+    checks.push({
+      id: "idr",
+      label: "IDR 30 mA em área molhada",
+      ok: false,
+      detail: "Pontos TUG 600 VA (cozinha / área de serviço) exigem IDR 30 mA.",
+      ref: "NBR 5410 5.1.3.1 / 9.1",
+    });
+  }
+  if (ctx?.parent) {
+    const parentR = calculate(ctx.parent);
+    const ratio = parentR.breaker > 0 ? parentR.breaker / Math.max(breaker, 1e-6) : 0;
+    const ordered = parentR.breaker > breaker;
+    checks.push({
+      id: "sel",
+      label: "Seletividade com o montante",
+      ok: ordered,
+      detail: ordered
+        ? ratio >= 1.6
+          ? `${ctx.parent.tag} In ${parentR.breaker} A / ${breaker} A = ${ratio.toFixed(2)} ≥ 1,6 · seletividade por corrente típica`
+          : `${ctx.parent.tag} In ${parentR.breaker} A / ${breaker} A = ${ratio.toFixed(2)} · seletividade parcial — confirmar tabela do fabricante`
+        : `${ctx.parent.tag} In ${parentR.breaker} A ≤ In deste circuito ${breaker} A`,
+      ref: "NBR 5410 5.7.2.4",
+    });
+  }
   if (al) {
     checks.push({
       id: "al",
@@ -476,6 +609,11 @@ export function calculate(input: CircuitInput): CircuitResult {
     inNeutral: harm.inNeutral,
     iaA,
     tDiscS,
+    istA,
+    dropStartPct: best.dropStart.dropPct,
+    startRatio,
+    icuKa: icu,
+    breakerCurve: curve,
   };
 }
 

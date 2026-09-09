@@ -23,7 +23,7 @@ function NormaPage() {
             <li>Corrente de projeto Ib a partir de kVA, kW, cv, valor informado, demanda TUG (100/600 VA) ou iluminação (15 W/m²).</li>
             <li>Fatores de correção de temperatura (Tab. 40), agrupamento (Tab. 13, 14, 16 e 17) e solo (Tab. 41, método D).</li>
             <li>Seção mínima que atende Iz ≥ Ib, queda de tensão e I²t de curto-circuito, com paralelismo até 6 por fase.</li>
-            <li>Coordenação Ib ≤ In ≤ Iz e I² ≤ 1,45 Iz (5.7.2.2.1). PE térmico (Icw = k·S/√t) e desligamento TN (Ia ≈ 5·In, 5.7.3).</li>
+            <li>Coordenação Ib ≤ In ≤ Iz e I² ≤ 1,45 Iz (5.7.2.2.1). PE térmico (Icw = k·S/√t) e desligamento TN (Ia da curva B/C/D), TT (IDR) ou IT (1ª falta).</li>
             <li>Neutro (Tab. 48), 3ª harmônica (6.2.6: Fh 0,86 a partir de 15 %; dimensionar pelo neutro acima de 33 %) e PE (Tab. 58).</li>
             <li>
               Ferramentas de instalação no mesmo projeto: ocupação de eletroduto (53 / 31 / 40 %, trecho 15/30 m, raio de
@@ -31,7 +31,9 @@ function NormaPage() {
               envelope de concreto (A, B, C, D + 75 mm de fundo).
             </li>
             <li>Alumínio: Imax ≈ 0,78 da tabela Cu, Rca × 1,64, k 76/94, seção mínima 16 mm² (Tab. 47) — sem tabelas Al da NBR.</li>
-            <li>Queda acumulada da origem ao ponto (soma dos trechos, 6.2.7) e lista de materiais na memória.</li>
+            <li>Queda acumulada da origem ao ponto (soma dos trechos, 6.2.7), quadro de cargas (Ib × Fd) e lista de materiais na memória.</li>
+            <li>Partida de motor (DOL 7,5·Ib, Y-Δ 2,5, soft 3, VFD 1,2) com teto de ΔV nos bornes; Icu do disjuntor ≥ Icc na origem; seletividade com o montante (relação de In).</li>
+            <li>IDR 30/100/300 mA (obrigatório em TUG molhada e no esquema TT; tipo AC recusado com 3ª harmônica ≥ 15 %).</li>
             <li>Catálogo de motores 4 pólos 60 Hz da planilha (rendimento, FP, disjuntor, contator, relé).</li>
           </ul>
         </Card>
@@ -98,9 +100,16 @@ function NormaPage() {
               Cu, Rca × 1,64, k 76 (PVC) / 94 (HEPR) e seção mínima 16 mm². Confrontar com o catálogo do fabricante.
             </li>
             <li>
-              <strong className="text-fg">PE e TN</strong> — o PE cresce se I²t do curto exigir seção maior que a Tab. 58.
-              No esquema TN, Ia ≈ 5·In deve ser menor que o Icc no ponto, no tempo de 0,4 s (circuitos terminais) ou 5 s
-              (distribuição).
+              <strong className="text-fg">PE e esquemas</strong> — o PE cresce se I²t do curto exigir seção maior que a Tab. 58.
+              TN: Ia da curva B/C/D (5/10/20·In) menor que o Icc no ponto. TT: IDR obrigatório. IT: 1ª falta não desliga.
+            </li>
+            <li>
+              <strong className="text-fg">Icu e seletividade</strong> — Icu comercial ≥ Icc na origem (IEC 60947-2). Com trecho a
+              montante, In do pai deve ser maior que o deste circuito; relação ≥ 1,6 indica seletividade por corrente típica.
+            </li>
+            <li>
+              <strong className="text-fg">Partida de motor</strong> — a seção também atende ΔV na Ist (teto 10 % nos bornes, ajustável).
+              Direta 7,5·Ib e cosφ 0,35; estrela-triângulo 2,5; soft-starter 3; inversor 1,2.
             </li>
             <li>
               <strong className="text-fg">Eletroduto</strong> — teto 53 / 31 / 40 % pelo número de CONDUTORES. Trecho

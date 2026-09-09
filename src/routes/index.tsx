@@ -28,8 +28,8 @@ function Home() {
 
   return (
     <AppShell
-      aside={<ResultsPanel input={active} circuits={project.circuits} origin={project.meta.origin} />}
-      strip={<VerdictStrip input={active} circuits={project.circuits} origin={project.meta.origin} />}
+      aside={<ResultsPanel input={active} circuits={project.circuits} origin={project.meta.origin} earthing={project.meta.earthing} />}
+      strip={<VerdictStrip input={active} circuits={project.circuits} origin={project.meta.origin} earthing={project.meta.earthing} />}
     >
       <div className="flex flex-col gap-5">
         <div>
